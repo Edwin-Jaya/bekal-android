@@ -1,5 +1,6 @@
 package com.edwin.bekal.core.network
 
+import android.util.Log
 import com.edwin.bekal.core.error.CommonFailure
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.decodeFromString
@@ -50,6 +51,16 @@ fun <T> ApiEnvelope<T>.requirePayload(): AppResult<T> {
     return AppResult.success(payload)
 }
 
+/** Untuk endpoint yang tidak mengembalikan data (mis. forgot-password, reset-password). */
+fun ApiEnvelope<*>.requireSuccess(): AppResult<Unit> {
+    if (!success) {
+        return AppResult.failure(
+            CommonFailure.ApiError(code = status.toString(), message = message.ifBlank { null })
+        )
+    }
+    return AppResult.success(Unit)
+}
+
 private fun HttpException.toFailure(json: Json): CommonFailure {
     if (code() == HTTP_UNAUTHORIZED || code() == HTTP_FORBIDDEN) return CommonFailure.Unauthorized
 
@@ -58,12 +69,14 @@ private fun HttpException.toFailure(json: Json): CommonFailure {
 
     val parsed = runCatching {
         json.decodeFromString(ApiEnvelope.serializer(Unit.serializer()), body)
+    }.onFailure { e ->
+        Log.e("AuthRepository", "Failed to parse error envelope. Raw body: $body", e)
     }.getOrNull()
 
     if (parsed != null) {
         return CommonFailure.ApiError(
             code = parsed.status.toString(),
-            details = listOf(parsed.message)
+            message = parsed.message.ifBlank { null }
         )
     }
 

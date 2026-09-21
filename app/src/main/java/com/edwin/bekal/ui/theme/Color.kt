@@ -65,6 +65,13 @@ val ElectricViolet = Color(0xFFA855F7)
 val DeepCharcoal = Color(0xFF121316)
 val TextMuted = Color(0xFF9CA3AF)
 
+val SuccessMain = Color(0xFF16A34A)
+val SuccessSoft = Color(0xFFE8F5E9)
+val WarningMain = Color(0xFFEA580C)
+val WarningSoft = Color(0xFFFFF3E0)
+val DangerMain = Color(0xFFDC2626)
+val DangerSoft = Color(0xFFFEE2E2)
+
 @Immutable
 data class ExtendedColors(
     val canvasBackground: Color = CanvasBackground,
@@ -72,7 +79,13 @@ data class ExtendedColors(
     val accentSoft: Color = AccentSoft,
     val electricViolet: Color = ElectricViolet,
     val deepCharcoal: Color = DeepCharcoal,
-    val textMuted: Color = TextMuted
+    val textMuted: Color = TextMuted,
+    val successMain: Color = SuccessMain,       // ⬅️ baru
+    val successSoft: Color = SuccessSoft,       // ⬅️ baru
+    val warningMain: Color = WarningMain,       // ⬅️ baru
+    val warningSoft: Color = WarningSoft,       // ⬅️ baru
+    val dangerMain: Color = DangerMain,         // ⬅️ baru
+    val dangerSoft: Color = DangerSoft          // ⬅️ baru
 )
 
 val LocalExtendedColors = staticCompositionLocalOf { ExtendedColors() }

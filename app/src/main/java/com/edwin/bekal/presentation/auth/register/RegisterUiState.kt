@@ -11,10 +11,24 @@ data class RegisterUiState(
     val dateOfBirth: String = "",
     val gender: String = "Laki-laki",
     val address: String = "",
+    val isEmailFromGoogle: Boolean = false,
+
+    // Step 1 Validation Errors
+    val fullNameError: String? = null,
+    val emailError: String? = null,
+    val passwordError: String? = null,
+    val phoneNumberError: String? = null,
+    val dateOfBirthError: String? = null,
+    val genderError: String? = null,
+    val addressError: String? = null,
 
     // --- Step 2: NIK & KTP ---
     val nik: String = "",
     val ktpImagePath: String? = null,
+
+    // Step 2 Validation Errors
+    val nikError: String? = null,
+    val ktpImageError: String? = null,
 
     // --- Step 3: Profesi & Pekerjaan ---
     val jobType: String = "",
@@ -38,6 +52,12 @@ data class RegisterUiState(
     val bankAccountNumber: String = "",
     val paySlipPaths: List<String> = emptyList(),
     val isTermsAgreed: Boolean = false,
+
+    // Step 4 Validation Errors
+    val bankNameError: String? = null,
+    val bankAccountNumberError: String? = null,
+    val paySlipError: String? = null,
+    val termsAgreedError: String? = null,
 
     // --- Submission & Status States ---
     val isLoading: Boolean = false,

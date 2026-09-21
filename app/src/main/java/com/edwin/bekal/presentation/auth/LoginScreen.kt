@@ -1,5 +1,8 @@
 package com.edwin.bekal.presentation.auth
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -23,26 +26,26 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -53,6 +56,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -60,6 +64,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.edwin.bekal.R
 import com.edwin.bekal.presentation.shared.sharedActivityViewModel
 import com.edwin.bekal.ui.theme.BekalTheme
 import com.edwin.bekal.ui.theme.Elevation
@@ -72,27 +77,42 @@ fun LoginScreen(
     onLoginSuccess: () -> Unit = {},
     viewModel: AuthViewModel = sharedActivityViewModel(),
     onForgotPasswordClick: () -> Unit = {},
-    onRegisterClick: () -> Unit = {},
+    onRegisterClick: (prefillEmail: String) -> Unit = {},
     onGoogleLoginClick: () -> Unit = {},
-    modifier: Modifier = Modifier,
-    onNavigateToRegister: () -> Unit
+    modifier: Modifier = Modifier
 ) {
     val extendedColors = BekalTheme.extendedColors
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    var email by rememberSaveable() { mutableStateOf("")}
-    var password by rememberSaveable() {mutableStateOf("") }
+    var email by rememberSaveable { mutableStateOf("") }
+    var password by rememberSaveable { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
     var rememberMe by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit){
-        email = "customer.test@bekal.com"
-        password = "P@ssw0rd123!"
+    BackHandler {
+        onBackClick()
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.savedEmail?.let { saved ->
+            if (saved.isNotBlank()) {
+                email = saved
+                rememberMe = true
+            }
+        }
     }
 
     LaunchedEffect(uiState.status) {
-        if(uiState.status == AuthStatus.AUTHENTICATED) {
+        if (uiState.status == AuthStatus.AUTHENTICATED) {
             onLoginSuccess()
+        }
+    }
+
+    // ✅ Fix: LaunchedEffect ditutup dengan benar
+    LaunchedEffect(uiState.pendingGoogleEmail) {
+        uiState.pendingGoogleEmail?.let { googleEmail ->
+            viewModel.clearPendingGoogleEmail()
+            onRegisterClick(googleEmail)
         }
     }
 
@@ -104,7 +124,7 @@ fun LoginScreen(
             .navigationBarsPadding()
             .imePadding()
     ) {
-        // Top Navigation Bar
+        // Navigation Top Bar
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -120,328 +140,356 @@ fun LoginScreen(
             }
         }
 
-        // Scrollable Content
+        // Scrollable Bento Container
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
-            horizontalAlignment = Alignment.CenterHorizontally,
+                .padding(horizontal = Spacing.lg, vertical = Spacing.xs),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Main Form Card
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(Spacing.xl),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = Elevation.none)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = Spacing.lg, vertical = Spacing.xl),
-                    horizontalAlignment = Alignment.CenterHorizontally
+            Column(modifier = Modifier.fillMaxWidth()) {
+
+                // Bento Header Card
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(Radius.xl),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = Elevation.none)
                 ) {
-                    // App Logo Icon
-                    Surface(
-                        shape = CircleShape,
-                        color = extendedColors.accentSoft,
-                        modifier = Modifier.size(48.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Default.Shield,
-                                contentDescription = "Logo",
-                                tint = extendedColors.electricViolet,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(Spacing.md))
-
-                    // Header Text
-                    Text(
-                        text = "Masuk",
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = extendedColors.deepCharcoal
-                    )
-
-                    Spacer(modifier = Modifier.height(Spacing.xxs))
-
-                    Text(
-                        text = "Lanjutkan ke akun Anda",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = extendedColors.textMuted
-                    )
-
-                    Spacer(modifier = Modifier.height(Spacing.lg))
-
-                    // Email Field
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        Text(
-                            text = "Email",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = extendedColors.deepCharcoal
-                        )
-                        Spacer(modifier = Modifier.height(Spacing.xs))
-                        OutlinedTextField(
-                            value = email,
-                            onValueChange = { email = it },
-                            placeholder = {
-                                Text(
-                                    text = "nama@email.com",
-                                    color = extendedColors.textMuted.copy(alpha = 0.6f),
-                                    fontSize = 14.sp
-                                )
-                            },
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(Radius.lg),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                unfocusedBorderColor = extendedColors.textMuted.copy(alpha = 0.2f),
-                                focusedBorderColor = extendedColors.electricViolet,
-                                unfocusedContainerColor = extendedColors.canvasBackground.copy(alpha = 0.3f),
-                                focusedContainerColor = Color.White
-                            )
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(Spacing.sm))
-
-                    // Password Field
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        Text(
-                            text = "Kata Sandi",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = extendedColors.deepCharcoal
-                        )
-                        Spacer(modifier = Modifier.height(Spacing.xs))
-                        OutlinedTextField(
-                            value = password,
-                            onValueChange = { password = it },
-                            placeholder = {
-                                Text(
-                                    text = "Masukkan kata sandi",
-                                    color = extendedColors.textMuted.copy(alpha = 0.6f),
-                                    fontSize = 14.sp
-                                )
-                            },
-                            singleLine = true,
-                            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                            trailingIcon = {
-                                val image = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
-                                IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                                    Icon(
-                                        imageVector = image,
-                                        contentDescription = null,
-                                        tint = extendedColors.textMuted
-                                    )
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(Radius.lg),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                unfocusedBorderColor = extendedColors.textMuted.copy(alpha = 0.2f),
-                                focusedBorderColor = extendedColors.electricViolet,
-                                unfocusedContainerColor = extendedColors.canvasBackground.copy(alpha = 0.3f),
-                                focusedContainerColor = Color.White
-                            )
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(Spacing.xs))
-
-                    // Remember Me & Forgot Password
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Checkbox(
-                                checked = rememberMe,
-                                onCheckedChange = { rememberMe = it },
-                                colors = CheckboxDefaults.colors(
-                                    checkedColor = extendedColors.electricViolet,
-                                    uncheckedColor = extendedColors.textMuted
-                                )
-                            )
-                            Text(
-                                text = "Ingat saya",
-                                fontSize = 12.sp,
-                                color = extendedColors.deepCharcoal
-                            )
-                        }
-
-                        Text(
-                            text = "Lupa Kata Sandi?",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = extendedColors.electricViolet,
-                            modifier = Modifier.clickable { onForgotPasswordClick() }
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(Spacing.md))
-
-                    // Login Button
-                    Button(
-                        onClick = { viewModel.login(email,password) },
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(48.dp),
-                        shape = CircleShape,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = extendedColors.deepCharcoal,
-                            contentColor = Color.White
-                        )
+                            .padding(Spacing.lg)
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
                         ) {
-                            Text(
-                                text = "Masuk",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.width(Spacing.xs))
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(Spacing.lg))
-
-                    // Divider "ATAU"
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        HorizontalDivider(
-                            modifier = Modifier.weight(1f),
-                            color = extendedColors.textMuted.copy(alpha = 0.2f)
-                        )
-                        Text(
-                            text = "ATAU",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = extendedColors.textMuted,
-                            modifier = Modifier.padding(horizontal = Spacing.md)
-                        )
-                        HorizontalDivider(
-                            modifier = Modifier.weight(1f),
-                            color = extendedColors.textMuted.copy(alpha = 0.2f)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(Spacing.lg))
-
-                    // Google Sign-In Button
-                    OutlinedButton(
-                        onClick = onGoogleLoginClick,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(46.dp),
-                        shape = CircleShape,
-                        border = androidx.compose.foundation.BorderStroke(
-                            1.dp,
-                            extendedColors.textMuted.copy(alpha = 0.25f)
-                        )
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
                             Surface(
                                 shape = CircleShape,
-                                color = extendedColors.canvasBackground,
-                                modifier = Modifier.size(20.dp)
+                                color = extendedColors.accentSoft,
+                                modifier = Modifier.size(28.dp)
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
-                                    Text(
-                                        text = "G",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        color = extendedColors.electricViolet
+                                    Image(
+                                        painter = painterResource(id = R.drawable.bekal_logo),
+                                        contentDescription = "bekal_logo",
+                                        modifier = Modifier.size(28.dp)
                                     )
                                 }
                             }
-                            Spacer(modifier = Modifier.width(Spacing.sm))
                             Text(
-                                text = "Lanjutkan dengan Google",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold,
+                                text = "BEKAL",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
                                 color = extendedColors.deepCharcoal
                             )
                         }
-                    }
 
-                    Spacer(modifier = Modifier.height(Spacing.lg))
+                        Spacer(modifier = Modifier.height(Spacing.md))
 
-                    // Register Redirect
-                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = "Belum punya akun? ",
-                            fontSize = 12.sp,
+                            text = "Selamat Datang!",
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = extendedColors.deepCharcoal
+                        )
+                        Spacer(modifier = Modifier.height(Spacing.xxs))
+                        Text(
+                            text = "Masukkan informasi akun Anda untuk masuk",
+                            fontSize = 13.sp,
                             color = extendedColors.textMuted
                         )
-                        Text(
-                            text = "Daftar sekarang",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = extendedColors.electricViolet,
-                            modifier = Modifier.clickable { onNavigateToRegister() }
-                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(Spacing.md))
+
+                // Bento Form Card Utama
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(Radius.xl),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = Elevation.none)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(Spacing.lg),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        // Tombol Google Sign-In
+                        OutlinedButton(
+                            onClick = onGoogleLoginClick,
+                            enabled = !uiState.isSubmitting,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(52.dp),
+                            shape = CircleShape,
+                            border = BorderStroke(
+                                1.dp,
+                                extendedColors.textMuted.copy(alpha = 0.2f)
+                            )
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Text(
+                                    text = "G",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = extendedColors.electricViolet
+                                )
+                                Spacer(modifier = Modifier.width(Spacing.sm))
+                                Text(
+                                    text = "Masuk dengan Google",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = extendedColors.deepCharcoal
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(Spacing.lg))
+
+                        // Pembatas "Atau"
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            HorizontalDivider(
+                                modifier = Modifier.weight(1f),
+                                color = extendedColors.textMuted.copy(alpha = 0.15f)
+                            )
+                            Text(
+                                text = "Atau",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = extendedColors.textMuted,
+                                modifier = Modifier.padding(horizontal = Spacing.md)
+                            )
+                            HorizontalDivider(
+                                modifier = Modifier.weight(1f),
+                                color = extendedColors.textMuted.copy(alpha = 0.15f)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(Spacing.lg))
+
+                        // Input Email
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                text = "Alamat Email",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = extendedColors.deepCharcoal
+                            )
+                            Spacer(modifier = Modifier.height(Spacing.xs))
+                            OutlinedTextField(
+                                value = email,
+                                onValueChange = { email = it },
+                                enabled = !uiState.isSubmitting,
+                                placeholder = {
+                                    Text(
+                                        text = "nama@email.com",
+                                        color = extendedColors.textMuted.copy(alpha = 0.5f),
+                                        fontSize = 14.sp
+                                    )
+                                },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = CircleShape,
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    unfocusedBorderColor = extendedColors.textMuted.copy(alpha = 0.15f),
+                                    focusedBorderColor = extendedColors.electricViolet,
+                                    unfocusedContainerColor = extendedColors.canvasBackground.copy(alpha = 0.5f),
+                                    focusedContainerColor = Color.White
+                                )
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(Spacing.md))
+
+                        // Input Password
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                text = "Kata Sandi",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = extendedColors.deepCharcoal
+                            )
+                            Spacer(modifier = Modifier.height(Spacing.xs))
+                            OutlinedTextField(
+                                value = password,
+                                onValueChange = { password = it },
+                                enabled = !uiState.isSubmitting,
+                                placeholder = {
+                                    Text(
+                                        text = "Masukkan kata sandi",
+                                        color = extendedColors.textMuted.copy(alpha = 0.5f),
+                                        fontSize = 14.sp
+                                    )
+                                },
+                                singleLine = true,
+                                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                                trailingIcon = {
+                                    val icon = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
+                                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                        Icon(
+                                            imageVector = icon,
+                                            contentDescription = null,
+                                            tint = extendedColors.textMuted
+                                        )
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = CircleShape,
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    unfocusedBorderColor = extendedColors.textMuted.copy(alpha = 0.15f),
+                                    focusedBorderColor = extendedColors.electricViolet,
+                                    unfocusedContainerColor = extendedColors.canvasBackground.copy(alpha = 0.5f),
+                                    focusedContainerColor = Color.White
+                                )
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(Spacing.sm))
+
+                        // Opsi Remember Me & Forgot Password
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Checkbox(
+                                    checked = rememberMe,
+                                    onCheckedChange = { rememberMe = it },
+                                    colors = CheckboxDefaults.colors(
+                                        checkedColor = extendedColors.electricViolet,
+                                        uncheckedColor = extendedColors.textMuted.copy(alpha = 0.5f)
+                                    )
+                                )
+                                Text(
+                                    text = "Ingat saya",
+                                    fontSize = 12.sp,
+                                    color = extendedColors.deepCharcoal
+                                )
+                            }
+
+                            Text(
+                                text = "Lupa Kata Sandi?",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = extendedColors.electricViolet,
+                                modifier = Modifier.clickable { onForgotPasswordClick() }
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(Spacing.lg))
+
+                        // Tombol Utama Masuk
+                        val isFormValid = email.isNotBlank() && password.isNotBlank()
+                        Button(
+                            onClick = { viewModel.login(email, password, rememberMe) },
+                            enabled = !uiState.isSubmitting && isFormValid,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(52.dp),
+                            shape = CircleShape,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = extendedColors.electricViolet,
+                                contentColor = Color.White,
+                                disabledContainerColor = extendedColors.electricViolet.copy(alpha = 0.4f),
+                                disabledContentColor = Color.White.copy(alpha = 0.7f)
+                            )
+                        ) {
+                            if (uiState.isSubmitting) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    color = Color.White,
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Text(
+                                    text = "Masuk",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(Spacing.lg))
+
+                        // Navigation Link Register
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "Belum punya akun? ",
+                                fontSize = 13.sp,
+                                color = extendedColors.textMuted
+                            )
+                            Text(
+                                text = "Daftar sekarang",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = extendedColors.electricViolet,
+                                // ✅ Fix: pass empty string untuk register manual
+                                modifier = Modifier.clickable { onRegisterClick("") }
+                            )
+                        }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(Spacing.lg))
+            Spacer(modifier = Modifier.height(Spacing.xl))
 
-            // Footer Section
+            // Footer Sertifikasi Keamanan
             Column(
-                modifier = Modifier.padding(bottom = Spacing.sm),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = Spacing.md),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Surface(
-                    shape = CircleShape,
-                    color = Color.White.copy(alpha = 0.8f)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.xs),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Security,
-                            contentDescription = null,
-                            tint = extendedColors.electricViolet,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Spacer(modifier = Modifier.width(Spacing.xs))
-                        Text(
-                            text = "Berizin & Diawasi oleh OJK • Terdaftar AFPI",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = extendedColors.deepCharcoal
-                        )
-                    }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Security,
+                        contentDescription = null,
+                        tint = extendedColors.electricViolet,
+                        modifier = Modifier.size(13.dp)
+                    )
+                    Spacer(modifier = Modifier.width(Spacing.xxs))
+                    Text(
+                        text = "Berizin & Diawasi OJK • Terdaftar AFPI",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = extendedColors.deepCharcoal
+                    )
                 }
-
-                Spacer(modifier = Modifier.height(Spacing.xs))
-
+                Spacer(modifier = Modifier.height(Spacing.xxs))
                 Text(
-                    text = "Terenkripsi standar perbankan ISO/IEC 27001",
+                    text = "Enkripsi standar perbankan ISO/IEC 27001",
                     fontSize = 10.sp,
                     color = extendedColors.textMuted
                 )
             }
         }
+    }
+
+    // Dialog Error Handling
+    uiState.errorMessage?.let { error ->
+        AlertDialog(
+            onDismissRequest = { viewModel.clearErrorMessage() },
+            title = { Text(text = "Login Gagal", fontWeight = FontWeight.Bold) },
+            text = { Text(text = error) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.clearErrorMessage() }) {
+                    Text("OK", color = extendedColors.electricViolet, fontWeight = FontWeight.Bold)
+                }
+            }
+        )
     }
 }

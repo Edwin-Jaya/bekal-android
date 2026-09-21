@@ -30,6 +30,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,8 +39,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.edwin.bekal.presentation.auth.AuthStatus
 import com.edwin.bekal.presentation.auth.AuthViewModel
 import com.edwin.bekal.ui.theme.BekalTheme
 import com.edwin.bekal.ui.theme.Elevation
@@ -49,13 +51,22 @@ import com.edwin.bekal.ui.theme.Spacing
 @Composable
 fun AccountScreen(
     onLogoutClick: () -> Unit = {},
+    onNavigateToEditProfile: () -> Unit = {},
+    onNavigateToFaq: () -> Unit = {},
     modifier: Modifier = Modifier,
+    onNavigateToHome: () -> Unit = {},
     authViewModel: AuthViewModel = hiltViewModel()
 ) {
     val extendedColors = BekalTheme.extendedColors
     val authUiState by authViewModel.uiState.collectAsStateWithLifecycle()
-    val displayName = authUiState.user?.name
-    val displayEmail = authUiState.user?.email
+    val displayName = authUiState.user?.name ?: "Pengguna Bekal"
+    val displayEmail = authUiState.user?.email ?: "-"
+
+    LaunchedEffect(authUiState.status) {
+        if (authUiState.status == AuthStatus.UNAUTHENTICATED) {
+            onLogoutClick()
+        }
+    }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -63,7 +74,7 @@ fun AccountScreen(
             top = Spacing.md,
             start = Spacing.xl,
             end = Spacing.xl,
-            bottom = 96.dp // Padding agar tidak tertutup floating bottom bar
+            bottom = 96.dp
         ),
         verticalArrangement = Arrangement.spacedBy(Spacing.lg)
     ) {
@@ -71,7 +82,7 @@ fun AccountScreen(
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(Spacing.xxl),
+                shape = RoundedCornerShape(Radius.xl),
                 colors = CardDefaults.cardColors(containerColor = Color.White),
                 elevation = CardDefaults.cardElevation(defaultElevation = Elevation.none)
             ) {
@@ -99,14 +110,14 @@ fun AccountScreen(
                     Spacer(modifier = Modifier.height(Spacing.md))
 
                     Text(
-                        text = "$displayName",
+                        text = displayName,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
                         color = extendedColors.deepCharcoal
                     )
 
                     Text(
-                        text = "$displayEmail",
+                        text = displayEmail,
                         fontSize = 12.sp,
                         color = extendedColors.textMuted
                     )
@@ -144,7 +155,7 @@ fun AccountScreen(
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(Spacing.xxl),
+                shape = RoundedCornerShape(Radius.xl),
                 colors = CardDefaults.cardColors(containerColor = Color.White),
                 elevation = CardDefaults.cardElevation(defaultElevation = Elevation.none)
             ) {
@@ -156,20 +167,23 @@ fun AccountScreen(
                     MenuItemRow(
                         icon = Icons.Default.Settings,
                         title = "Pengaturan Akun",
-                        onClick = {}
+                        onClick = onNavigateToEditProfile
                     )
                     HorizontalDivider(color = extendedColors.canvasBackground, thickness = 1.dp)
                     MenuItemRow(
                         icon = Icons.Default.HelpOutline,
                         title = "Pusat Bantuan & FAQ",
-                        onClick = {}
+                        onClick = onNavigateToFaq
                     )
                     HorizontalDivider(color = extendedColors.canvasBackground, thickness = 1.dp)
                     MenuItemRow(
                         icon = Icons.Default.Logout,
                         title = "Keluar",
                         isDestructive = true,
-                        onClick = onLogoutClick
+                        onClick = {
+                            authViewModel.logout()
+                            onNavigateToHome()
+                        }
                     )
                 }
             }

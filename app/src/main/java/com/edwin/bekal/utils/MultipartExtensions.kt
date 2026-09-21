@@ -4,12 +4,12 @@ import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.util.Log
+import android.webkit.MimeTypeMap
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
-import java.io.FileOutputStream
 import java.io.InputStream
 
 private const val TAG = "MultipartMapper"
@@ -49,18 +49,25 @@ fun Uri.toMultipartBodyPart(context: Context, paramName: String): MultipartBody.
             file.inputStream()
         }
 
-        val tempFile = File(context.cacheDir, fileName)
-        FileOutputStream(tempFile).use { outputStream ->
-            inputStream.use { it.copyTo(outputStream) }
-        }
+        // Baca langsung ke memory — TIDAK menyalin ulang ke cacheDir.
+        // (cacheDir bisa dibersihkan OS kapan saja — ini persis bug yang sudah
+        // pernah diperbaiki di flow registrasi lain, jangan diulang di sini.)
+        val bytes = inputStream.use { it.readBytes() }
 
-        val mimeType = if (scheme == "content") contentResolver.getType(this) else "image/jpeg"
-        val safeMimeType = mimeType ?: "image/jpeg"
+        // Deteksi MIME type dari ekstensi file yang sebenarnya, JANGAN hardcode
+        // "image/jpeg" untuk semua non-content uri — payslip PDF akan salah label.
+        val mimeType = when {
+            scheme == "content" -> contentResolver.getType(this)
+            else -> {
+                val extension = fileName.substringAfterLast('.', "").lowercase()
+                MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
+            }
+        } ?: "application/octet-stream"
 
-        val requestBody = tempFile.readBytes().toRequestBody(safeMimeType.toMediaTypeOrNull())
+        val requestBody = bytes.toRequestBody(mimeType.toMediaTypeOrNull())
 
-        Log.d(TAG, "Successfully built multipart part for uri=$this, size=${tempFile.length()} bytes")
-        MultipartBody.Part.createFormData(paramName, tempFile.name, requestBody)
+        Log.d(TAG, "Successfully built multipart part for uri=$this, size=${bytes.size} bytes, mime=$mimeType")
+        MultipartBody.Part.createFormData(paramName, fileName, requestBody)
     } catch (e: SecurityException) {
         Log.e(TAG, "SecurityException reading uri=$this — permission likely expired", e)
         null

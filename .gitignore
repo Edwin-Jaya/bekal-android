@@ -17,6 +17,8 @@ local.properties
 *firebase-adminsdk*.json
 *service-account*.json
 firebase-credentials.json
+.env
+/app/google-services.json
 
 keystore.properties
 *.jks

@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="512dp"
+    android:height="600dp"
+    android:viewportWidth="512"
+    android:viewportHeight="600">
+
+        <!-- Outer Shield Layer (Ungu Utama) -->
+        <path
+            android:fillColor="#6B3CE8"
+            android:pathData="M256,20 L448,84 C458,87 464,97 464,107 L464,260 C464,270 456,278 446,280 L420,285 L446,290 C456,292 464,300 464,310 L464,463 C464,473 458,483 448,486 L256,580 L64,486 C54,483 48,473 48,463 L48,310 C48,300 56,292 66,290 L92,285 L66,280 C56,278 48,270 48,260 L48,107 C48,97 54,87 64,84 Z" />
+
+        <!-- Inner Shield Frame (Hitam/Gelap) -->
+        <path
+            android:fillColor="#19181D"
+            android:pathData="M256,52 L422,110 C428,112 432,118 432,125 L432,252 C432,259 426,265 418,267 L390,272 L418,277 C426,279 432,285 432,292 L432,445 C432,452 428,458 422,460 L256,528 L90,460 C84,458 80,452 80,445 L80,292 C80,285 86,279 94,277 L122,272 L94,267 C86,265 80,259 80,252 L80,125 C80,118 84,112 90,110 Z" />
+
+        <!-- Shield Interior Fill (Putih) -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M256,80 L394,128 C398,129 400,133 400,137 L400,242 C400,247 395,252 390,253 L360,258 L390,263 C395,264 400,269 400,274 L400,427 C400,431 398,435 394,436 L256,488 L118,436 C114,435 112,431 112,427 L112,274 C112,269 117,264 122,263 L152,258 L122,253 C117,252 112,247 112,242 L112,137 C112,133 114,129 118,128 Z" />
+
+        <!-- Huruf "B" Lengkungan Atas (Gelap) -->
+        <path
+            android:fillColor="#19181D"
+            android:fillType="evenOdd"
+            android:pathData="M180,150 L285,150 C325,150 355,170 355,205 C355,240 325,260 285,260 L180,260 Z M225,185 L280,185 C298,185 310,192 310,205 C310,218 298,225 280,225 L225,225 Z" />
+
+        <!-- Huruf "B" Lengkungan Bawah (Gelap) -->
+        <path
+            android:fillColor="#19181D"
+            android:fillType="evenOdd"
+            android:pathData="M180,290 L285,290 C325,290 355,310 355,345 C355,380 325,400 285,400 L180,400 Z M225,325 L280,325 C298,325 310,332 310,345 C310,358 298,365 280,365 L225,365 Z" />
+
+        <!-- Pita Horizontal Ungu Kiri -->
+        <path
+            android:fillColor="#6B3CE8"
+            android:pathData="M48,273 L272,273 C282,273 288,279 285,287 C282,295 274,297 264,297 L48,297 Z" />
+
+        <!-- Pita Horizontal Ungu Kanan (Berujung Takik Arrow) -->
+        <path
+            android:fillColor="#6B3CE8"
+            android:pathData="M375,273 L464,273 L464,297 L375,297 L360,285 Z" />
+
+</vector>

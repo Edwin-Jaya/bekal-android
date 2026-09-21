@@ -2,6 +2,7 @@ package com.edwin.bekal.presentation.auth.register
 
 import android.content.Context
 import android.net.Uri
+import android.util.Patterns
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.edwin.bekal.core.error.toErrorMessage
@@ -38,42 +39,96 @@ class RegisterViewModel @Inject constructor(
         "lainnya"
     )
 
+    fun prefillGoogleEmail(email: String) {
+        _uiState.update { it.copy(
+            email = email,
+            isEmailFromGoogle = true  // ← untuk lock field di UI
+        )}
+    }
+
     // --- STEP 1: Akun & Data Diri ---
     fun onFullNameChange(fullName: String) {
-        _uiState.update { it.copy(fullName = fullName) }
+        _uiState.update {
+            it.copy(
+                fullName = fullName,
+                fullNameError = if (fullName.isNotBlank()) null else it.fullNameError
+            )
+        }
     }
 
     fun onEmailChange(email: String) {
-        _uiState.update { it.copy(email = email) }
+        _uiState.update {
+            it.copy(
+                email = email,
+                emailError = if (email.isNotBlank()) null else it.emailError
+            )
+        }
     }
 
     fun onPasswordChange(password: String) {
-        _uiState.update { it.copy(password = password) }
+        _uiState.update {
+            it.copy(
+                password = password,
+                passwordError = if (password.isNotBlank()) null else it.passwordError
+            )
+        }
     }
 
     fun onPhoneNumberChange(phone: String) {
-        _uiState.update { it.copy(phoneNumber = phone) }
+        val digitsOnly = phone.filter { it.isDigit() }
+        _uiState.update {
+            it.copy(
+                phoneNumber = digitsOnly,
+                phoneNumberError = if (digitsOnly.isNotBlank()) null else it.phoneNumberError
+            )
+        }
     }
 
     fun onDateOfBirthChange(dob: String) {
-        _uiState.update { it.copy(dateOfBirth = dob) }
+        _uiState.update {
+            it.copy(
+                dateOfBirth = dob,
+                dateOfBirthError = if (dob.isNotBlank()) null else it.dateOfBirthError
+            )
+        }
     }
 
     fun onGenderChange(gender: String) {
-        _uiState.update { it.copy(gender = gender) }
+        _uiState.update {
+            it.copy(
+                gender = gender,
+                genderError = if (gender.isNotBlank()) null else it.genderError
+            )
+        }
     }
 
     fun onAddressChange(address: String) {
-        _uiState.update { it.copy(address = address) }
+        _uiState.update {
+            it.copy(
+                address = address,
+                addressError = if (address.isNotBlank()) null else it.addressError
+            )
+        }
     }
 
     // --- STEP 2: NIK & KTP ---
     fun onNikChange(nik: String) {
-        _uiState.update { it.copy(nik = nik) }
+        val digitsOnly = nik.filter { it.isDigit() }.take(16)
+        _uiState.update {
+            it.copy(
+                nik = digitsOnly,
+                nikError = if (digitsOnly.length == 16) null else it.nikError
+            )
+        }
     }
 
     fun onKtpImagePathChange(path: String?) {
-        _uiState.update { it.copy(ktpImagePath = path) }
+        _uiState.update {
+            it.copy(
+                ktpImagePath = path,
+                ktpImageError = if (!path.isNullOrBlank()) null else it.ktpImageError
+            )
+        }
     }
 
     // --- STEP 3: Profesi & Pekerjaan ---
@@ -139,26 +194,121 @@ class RegisterViewModel @Inject constructor(
 
     // --- STEP 4: Finansial & Dokumen ---
     fun onBankNameChange(value: String) {
-        _uiState.update { it.copy(bankName = value) }
+        _uiState.update {
+            it.copy(
+                bankName = value,
+                bankNameError = if (value.isNotBlank()) null else it.bankNameError
+            )
+        }
     }
 
     fun onBankAccountNumberChange(value: String) {
-        _uiState.update { it.copy(bankAccountNumber = value) }
+        val digitsOnly = value.filter { it.isDigit() }
+        _uiState.update {
+            it.copy(
+                bankAccountNumber = digitsOnly,
+                bankAccountNumberError = if (digitsOnly.isNotBlank()) null else it.bankAccountNumberError
+            )
+        }
     }
 
     fun onPaySlipPathsChange(paths: List<String>) {
-        _uiState.update { it.copy(paySlipPaths = paths) }
+        _uiState.update {
+            it.copy(
+                paySlipPaths = paths,
+                paySlipError = if (paths.isNotEmpty()) null else it.paySlipError
+            )
+        }
     }
 
     fun onTermsAgreedChange(isAgreed: Boolean) {
-        _uiState.update { it.copy(isTermsAgreed = isAgreed) }
+        _uiState.update {
+            it.copy(
+                isTermsAgreed = isAgreed,
+                termsAgreedError = if (isAgreed) null else it.termsAgreedError
+            )
+        }
     }
 
     fun clearErrorMessage() {
         _uiState.update { it.copy(errorMessage = null) }
     }
 
-    // --- Validation Methods ---
+    // --- Validation Methods per Step ---
+    fun validateStepAccount(): Boolean {
+        val currentState = _uiState.value
+
+        val fullNameError = if (currentState.fullName.isBlank()) "Nama lengkap wajib diisi" else null
+
+        val isEmailPatternValid = Patterns.EMAIL_ADDRESS.matcher(currentState.email).matches()
+        val isGmailDomain = currentState.email.lowercase().endsWith("@gmail.com")
+        val emailError = when {
+            currentState.email.isBlank() -> "Alamat email wajib diisi"
+            !isGmailDomain || !isEmailPatternValid -> "Email harus berformat valid (contoh: user@gmail.com)"
+            else -> null
+        }
+
+        val passwordError = when {
+            currentState.password.isBlank() -> "Kata sandi wajib diisi"
+            currentState.password.length < 8 -> "Kata sandi minimal 8 karakter"
+            else -> null
+        }
+
+        val phoneNumberError = when {
+            currentState.phoneNumber.isBlank() -> "Nomor handphone wajib diisi"
+            currentState.phoneNumber.length < 9 -> "Nomor handphone tidak valid"
+            else -> null
+        }
+
+        val dateOfBirthError = if (currentState.dateOfBirth.isBlank()) "Tanggal lahir wajib diisi" else null
+        val genderError = if (currentState.gender.isBlank()) "Jenis kelamin wajib dipilih" else null
+        val addressError = if (currentState.address.isBlank()) "Alamat domisili wajib diisi" else null
+
+        val isValid = listOf(
+            fullNameError, emailError, passwordError, phoneNumberError,
+            dateOfBirthError, genderError, addressError
+        ).all { it == null }
+
+        _uiState.update {
+            it.copy(
+                fullNameError = fullNameError,
+                emailError = emailError,
+                passwordError = passwordError,
+                phoneNumberError = phoneNumberError,
+                dateOfBirthError = dateOfBirthError,
+                genderError = genderError,
+                addressError = addressError
+            )
+        }
+
+        return isValid
+    }
+
+    fun validateStepIdentity(): Boolean {
+        val currentState = _uiState.value
+
+        val nikError = when {
+            currentState.nik.isBlank() -> "Nomor NIK wajib diisi"
+            currentState.nik.length != 16 -> "NIK harus terdiri dari 16 digit angka"
+            else -> null
+        }
+
+        val ktpImageError = if (currentState.ktpImagePath.isNullOrBlank()) {
+            "Foto fisik e-KTP wajib diunggah"
+        } else null
+
+        val isValid = listOf(nikError, ktpImageError).all { it == null }
+
+        _uiState.update {
+            it.copy(
+                nikError = nikError,
+                ktpImageError = ktpImageError
+            )
+        }
+
+        return isValid
+    }
+
     fun validateJobStep(): Boolean {
         val currentState = _uiState.value
 
@@ -214,21 +364,39 @@ class RegisterViewModel @Inject constructor(
         return isValid
     }
 
+    fun validateStepFinancial(): Boolean {
+        val currentState = _uiState.value
+
+        val bankNameError = if (currentState.bankName.isBlank()) "Nama bank penerima wajib diisi" else null
+        val bankAccountNumberError = if (currentState.bankAccountNumber.isBlank()) "Nomor rekening bank wajib diisi" else null
+        val paySlipError = if (currentState.paySlipPaths.isEmpty()) "Minimal 1 dokumen slip gaji wajib diunggah" else null
+        val termsAgreedError = if (!currentState.isTermsAgreed) "Anda wajib menyetujui Syarat & Ketentuan Layanan" else null
+
+        val isValid = listOf(
+            bankNameError,
+            bankAccountNumberError,
+            paySlipError,
+            termsAgreedError
+        ).all { it == null }
+
+        _uiState.update {
+            it.copy(
+                bankNameError = bankNameError,
+                bankAccountNumberError = bankAccountNumberError,
+                paySlipError = paySlipError,
+                termsAgreedError = termsAgreedError
+            )
+        }
+
+        return isValid
+    }
+
     private fun validateCurrentStep(): Boolean {
         return when (_uiState.value.currentStep) {
+            1 -> validateStepAccount()
+            2 -> validateStepIdentity()
             3 -> validateJobStep()
-            4 -> {
-                val currentState = _uiState.value
-                if (currentState.bankName.isBlank() || currentState.bankAccountNumber.isBlank()) {
-                    _uiState.update { it.copy(errorMessage = "Data rekening bank wajib diisi") }
-                    return false
-                }
-                if (!currentState.isTermsAgreed) {
-                    _uiState.update { it.copy(errorMessage = "Anda harus menyetujui Syarat & Ketentuan") }
-                    return false
-                }
-                true
-            }
+            4 -> validateStepFinancial()
             else -> true
         }
     }
@@ -310,22 +478,26 @@ class RegisterViewModel @Inject constructor(
 
             // 2. Upload foto KTP
             _uiState.update { it.copy(loadingMessage = "Mengunggah dokumen e-KTP...") }
-            val ktpUri = state.ktpImagePath.toSafeUri() // Gunakan toSafeUri() bukan Uri.parse()
+            val ktpUri = state.ktpImagePath.toSafeUri()
             repository.uploadDocument(context, customerId, "KTP", ktpUri)
                 .onFailure { failure ->
+                    _uiState.update { it.copy(loadingMessage = "Membatalkan registrasi...") }
+                    repository.rollbackRegistration(customerId)
                     _uiState.update {
                         it.copy(isLoading = false, errorMessage = failure.toErrorMessage())
                     }
                     return@launch
                 }
 
-            // 3. Upload Berkas Slip Gaji (opsional / jika ada)
+            // 3. Upload Berkas Slip Gaji
             if (state.paySlipPaths.isNotEmpty()) {
                 _uiState.update { it.copy(loadingMessage = "Mengunggah berkas slip gaji...") }
                 for (path in state.paySlipPaths) {
-                    val slipUri = path.toSafeUri() // Gunakan toSafeUri()
+                    val slipUri = path.toSafeUri()
                     repository.uploadDocument(context, customerId, "SLIP_GAJI", slipUri)
                         .onFailure { failure ->
+                            _uiState.update { it.copy(loadingMessage = "Membatalkan registrasi...") }
+                            repository.rollbackRegistration(customerId)
                             _uiState.update {
                                 it.copy(isLoading = false, errorMessage = failure.toErrorMessage())
                             }
@@ -339,8 +511,8 @@ class RegisterViewModel @Inject constructor(
             val bankDto = CreateBankAccountRequestDto(
                 customerId = customerId,
                 bankName = state.bankName,
-                bankAccountNumber = state.bankAccountNumber,   // sebelumnya: accountNumber
-                bankAccountHolder = state.fullName,             // sebelumnya: accountHolderName
+                bankAccountNumber = state.bankAccountNumber,
+                bankAccountHolder = state.fullName,
                 isPrimary = true
             )
 
@@ -356,6 +528,8 @@ class RegisterViewModel @Inject constructor(
                     }
                 }
                 .onFailure { failure ->
+                    _uiState.update { it.copy(loadingMessage = "Membatalkan registrasi...") }
+                    repository.rollbackRegistration(customerId)
                     _uiState.update {
                         it.copy(isLoading = false, errorMessage = failure.toErrorMessage())
                     }

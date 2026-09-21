@@ -11,8 +11,21 @@ sealed interface RootRoute {
     @Serializable data object MainContainer : RootRoute
     @Serializable data class LoanDetail(val loanId: String) : RootRoute
 
+    @Serializable data class LoanRepayment(val loanId: String) : RootRoute
     // Form pengajuan pinjaman (fullscreen, seperti Register)
-    @Serializable data class LoanApplication(val plafondId: String, val plafondLimit: String) : RootRoute
+    @Serializable data class LoanApplication(val plafondLimit: String) : RootRoute
+
+    @Serializable
+    data object EditProfile : RootRoute
+    @Serializable
+    data class CaraBayar(val virtualAccountNumber: String) : RootRoute
+
+    @Serializable
+    data object Faq : RootRoute
+
+    @Serializable
+    data object Splash : RootRoute
+
 }
 
 // Rute Internal Bottom Navigation

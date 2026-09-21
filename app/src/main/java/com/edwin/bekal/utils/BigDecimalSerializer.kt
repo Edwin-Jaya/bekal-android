@@ -7,7 +7,8 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.JsonDecoder
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import java.math.BigDecimal
 
 object BigDecimalSerializer : KSerializer<BigDecimal> {
@@ -15,13 +16,18 @@ object BigDecimalSerializer : KSerializer<BigDecimal> {
         PrimitiveSerialDescriptor("BigDecimal", PrimitiveKind.STRING)
 
     override fun deserialize(decoder: Decoder): BigDecimal {
-        return if (decoder is JsonDecoder) {
-            // Reads raw numeric tokens or quoted string tokens equally well
+        val rawString = if (decoder is JsonDecoder) {
             val element = decoder.decodeJsonElement()
-            BigDecimal(element.jsonPrimitive.content)
+            (element as? JsonPrimitive)?.contentOrNull
         } else {
-            BigDecimal(decoder.decodeString())
+            runCatching { decoder.decodeString() }.getOrNull()
         }
+
+        if (rawString.isNullOrBlank() || rawString.equals("null", ignoreCase = true)) {
+            return BigDecimal.ZERO
+        }
+
+        return runCatching { BigDecimal(rawString) }.getOrDefault(BigDecimal.ZERO)
     }
 
     override fun serialize(encoder: Encoder, value: BigDecimal) {

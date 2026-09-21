@@ -6,22 +6,55 @@ import android.provider.OpenableColumns
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.AccountBalance
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material.icons.filled.UploadFile
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.edwin.bekal.presentation.auth.register.RegisterUiState
 import com.edwin.bekal.presentation.auth.register.RegisterViewModel
+import com.edwin.bekal.ui.theme.BekalTheme
+import com.edwin.bekal.ui.theme.Elevation
+import com.edwin.bekal.ui.theme.Radius
+import com.edwin.bekal.ui.theme.Spacing
 import com.edwin.bekal.utils.copyToAppCache
 
 @Composable
@@ -30,17 +63,29 @@ fun StepFinancialContent(
     viewModel: RegisterViewModel,
     modifier: Modifier = Modifier
 ) {
+    val extendedColors = BekalTheme.extendedColors
     val context = LocalContext.current
+    val scrollState = rememberScrollState()
 
-    // Launcher untuk memilih dokumen Slip Gaji (PDF / Gambar)
+    val textFieldColors = OutlinedTextFieldDefaults.colors(
+        unfocusedBorderColor = extendedColors.textMuted.copy(alpha = 0.15f),
+        focusedBorderColor = extendedColors.electricViolet,
+        unfocusedContainerColor = extendedColors.canvasBackground.copy(alpha = 0.5f),
+        focusedContainerColor = Color.White
+    )
+
+    LaunchedEffect(Unit) {
+        if (uiState.bankName != "BCA") {
+            viewModel.onBankNameChange("BCA")
+        }
+    }
+
     val documentLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetMultipleContents()
     ) { uris: List<Uri> ->
         if (uris.isNotEmpty()) {
             val currentList = uiState.paySlipPaths.toMutableList()
 
-            // PENTING: copy tiap Uri ke cache app SAAT DIPILIH,
-            // jangan simpan content:// uri mentah ke state.
             uris.forEach { uri ->
                 if (currentList.size >= 3) return@forEach
 
@@ -48,17 +93,12 @@ fun StepFinancialContent(
                     ?.substringAfterLast('/')
                     ?: "pdf"
 
-                val localPath = uri.copyToAppCache(
-                    context,
-                    prefix = "payslip_",
-                    extension = extension
-                )
+                val localPath = uri.copyToAppCache(context, prefix = "payslip_", extension = extension)
 
                 if (localPath != null && !currentList.contains(localPath)) {
                     currentList.add(localPath)
                 } else if (localPath == null) {
                     Log.e("StepFinancialContent", "Failed to copy payslip uri to cache: $uri")
-                    // opsional: tampilkan snackbar/error ke user di sini
                 }
             }
 
@@ -69,18 +109,20 @@ fun StepFinancialContent(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+            .verticalScroll(scrollState)
+            .padding(Spacing.md),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md)
     ) {
-        // --- CARD 01: Upload Slip Gaji ---
+        // --- BENTO CARD 01: Upload Slip Gaji ---
         Card(
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(Radius.xl),
             colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = Elevation.none),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(
-                modifier = Modifier.padding(10.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                modifier = Modifier.padding(Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.md)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -88,28 +130,31 @@ fun StepFinancialContent(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
-                        Text("DOKUMEN SLIP GAJI", fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                        Text("Unggah Berkas (3 Bulan Terakhir) • PDF / Image *", fontSize = 10.sp, color = Color.Gray)
+                        Text("Dokumen Slip Gaji *", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = extendedColors.deepCharcoal)
+                        Text("Unggah berkas 3 bulan terakhir (PDF / Image)", fontSize = 12.sp, color = extendedColors.textMuted)
                     }
-                    Text(
-                        text = "${uiState.paySlipPaths.size}/3 File",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (uiState.paySlipPaths.size == 3) Color(0xFF10B981) else Color(0xFF7E22CE)
-                    )
+                    Surface(shape = CircleShape, color = extendedColors.accentSoft) {
+                        Text(
+                            text = "${uiState.paySlipPaths.size}/3 File",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = extendedColors.electricViolet,
+                            modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xxs)
+                        )
+                    }
                 }
 
                 if (uiState.paySlipPaths.isEmpty()) {
                     Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = Color(0xFFF9FAFB),
+                        shape = RoundedCornerShape(Radius.lg),
+                        color = extendedColors.canvasBackground,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Box(
                             contentAlignment = Alignment.Center,
-                            modifier = Modifier.padding(16.dp)
+                            modifier = Modifier.padding(Spacing.lg)
                         ) {
-                            Text("Belum ada dokumen slip gaji yang diunggah", fontSize = 10.sp, color = Color.Gray)
+                            Text("Belum ada dokumen slip gaji yang diunggah", fontSize = 12.sp, color = extendedColors.textMuted)
                         }
                     }
                 } else {
@@ -117,12 +162,12 @@ fun StepFinancialContent(
                         val fileName = getFileNameFromUri(context, Uri.parse(path)) ?: "Slip_Gaji_${index + 1}.pdf"
 
                         Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = Color(0xFFF9FAFB),
+                            shape = RoundedCornerShape(Radius.md),
+                            color = extendedColors.canvasBackground,
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
@@ -133,15 +178,16 @@ fun StepFinancialContent(
                                     Icon(
                                         imageVector = Icons.Default.PictureAsPdf,
                                         contentDescription = null,
-                                        tint = Color(0xFF7E22CE),
-                                        modifier = Modifier.size(16.dp)
+                                        tint = extendedColors.electricViolet,
+                                        modifier = Modifier.size(20.dp)
                                     )
-                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Spacer(modifier = Modifier.width(Spacing.xs))
                                     Text(
                                         text = fileName,
-                                        fontSize = 11.sp,
+                                        fontSize = 12.sp,
                                         fontWeight = FontWeight.Medium,
-                                        maxLines = 1
+                                        maxLines = 1,
+                                        color = extendedColors.deepCharcoal
                                     )
                                 }
                                 IconButton(
@@ -155,7 +201,7 @@ fun StepFinancialContent(
                                         imageVector = Icons.Default.Close,
                                         contentDescription = "Hapus File",
                                         tint = Color.Red,
-                                        modifier = Modifier.size(14.dp)
+                                        modifier = Modifier.size(16.dp)
                                     )
                                 }
                             }
@@ -163,51 +209,68 @@ fun StepFinancialContent(
                     }
                 }
 
+                uiState.paySlipError?.let { Text(it, color = Color.Red, fontSize = 11.sp) }
+
                 if (uiState.paySlipPaths.size < 3) {
                     OutlinedButton(
                         onClick = { documentLauncher.launch("*/*") },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(34.dp),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                            .height(48.dp),
+                        shape = CircleShape
                     ) {
-                        Icon(Icons.Default.UploadFile, contentDescription = null, modifier = Modifier.size(14.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Pilih Berkas Slip Gaji", fontSize = 11.sp)
+                        Icon(Icons.Default.UploadFile, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(Spacing.xs))
+                        Text("Pilih Berkas Slip Gaji", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
         }
 
-        // --- CARD 02: Rekening Bank ---
+        // --- BENTO CARD 02: Rekening Bank ---
         Card(
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(Radius.xl),
             colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = Elevation.none),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(
-                modifier = Modifier.padding(10.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                modifier = Modifier.padding(Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.md)
             ) {
-                Text("REKENING BANK PENERIMA", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                Text("Rekening Bank Penerima", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = extendedColors.deepCharcoal)
 
                 OutlinedTextField(
-                    value = uiState.bankName,
-                    onValueChange = viewModel::onBankNameChange,
-                    label = { Text("Nama Bank *", fontSize = 11.sp) },
-                    trailingIcon = { Icon(Icons.Default.ArrowDropDown, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                    value = "BCA",
+                    onValueChange = { },
+                    readOnly = true,
+                    label = { Text("Bank Tujuan", fontSize = 12.sp) },
+                    leadingIcon = { Icon(Icons.Default.AccountBalance, contentDescription = null, tint = extendedColors.textMuted) },
+                    trailingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = extendedColors.textMuted) },
+                    supportingText = { Text("Saat ini hanya mendukung Bank BCA", fontSize = 11.sp, color = extendedColors.textMuted) },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(6.dp),
+                    shape = CircleShape,
+                    colors = textFieldColors,
                     singleLine = true
                 )
 
                 OutlinedTextField(
                     value = uiState.bankAccountNumber,
-                    onValueChange = viewModel::onBankAccountNumberChange,
-                    label = { Text("Nomor Rekening *", fontSize = 11.sp) },
-                    trailingIcon = { Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(18.dp)) },
+                    onValueChange = { input ->
+                        if (input.all { it.isDigit() }) viewModel.onBankAccountNumberChange(input)
+                    },
+                    label = { Text("Nomor Rekening *", fontSize = 12.sp) },
+                    trailingIcon = {
+                        if (uiState.bankAccountNumber.isNotBlank()) {
+                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = extendedColors.electricViolet)
+                        }
+                    },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    isError = uiState.bankAccountNumberError != null,
+                    supportingText = uiState.bankAccountNumberError?.let { { Text(it, color = Color.Red, fontSize = 11.sp) } },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(6.dp),
+                    shape = CircleShape,
+                    colors = textFieldColors,
                     singleLine = true
                 )
 
@@ -215,34 +278,56 @@ fun StepFinancialContent(
                     value = uiState.fullName,
                     onValueChange = { },
                     readOnly = true,
-                    label = { Text("Nama Pemilik Rekening (Sesuai KTP)", fontSize = 11.sp) },
+                    label = { Text("Nama Pemilik Rekening (Sesuai KTP)", fontSize = 12.sp) },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(6.dp),
+                    shape = CircleShape,
+                    colors = textFieldColors,
                     singleLine = true
                 )
             }
         }
 
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
+        // --- BENTO CARD 03: Syarat & Ketentuan ---
+        Card(
+            shape = RoundedCornerShape(Radius.xl),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = Elevation.none),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Checkbox(
-                checked = uiState.isTermsAgreed,
-                onCheckedChange = viewModel::onTermsAgreedChange,
-                modifier = Modifier.scale(0.85f)
-            )
-            Spacer(modifier = Modifier.width(2.dp))
-            Text(
-                "Saya menyatakan seluruh dokumen dan data yang diberikan adalah benar dan menyetujui Syarat & Ketentuan Layanan BEKAL.",
-                fontSize = 10.sp,
-                color = Color.DarkGray
-            )
+            Column(modifier = Modifier.padding(Spacing.md)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Checkbox(
+                        checked = uiState.isTermsAgreed,
+                        onCheckedChange = viewModel::onTermsAgreedChange,
+                        colors = CheckboxDefaults.colors(
+                            checkedColor = extendedColors.electricViolet,
+                            uncheckedColor = extendedColors.textMuted.copy(alpha = 0.5f)
+                        )
+                    )
+                    Spacer(modifier = Modifier.width(Spacing.xs))
+                    Text(
+                        text = "Saya menyatakan bahwa seluruh dokumen dan data yang diisi adalah benar serta menyetujui Syarat & Ketentuan Layanan BEKAL.",
+                        fontSize = 12.sp,
+                        color = extendedColors.deepCharcoal
+                    )
+                }
+
+                uiState.termsAgreedError?.let { errorMsg ->
+                    Text(
+                        text = errorMsg,
+                        color = Color.Red,
+                        fontSize = 11.sp,
+                        modifier = Modifier.padding(start = Spacing.lg)
+                    )
+                }
+            }
         }
     }
 }
 
-// Helper untuk membaca nama asli berkas dari Content Resolver Uri
 private fun getFileNameFromUri(context: Context, uri: Uri): String? {
     var fileName: String? = null
     if (uri.scheme == "content") {

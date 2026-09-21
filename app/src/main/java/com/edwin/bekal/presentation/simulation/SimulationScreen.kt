@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
@@ -20,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Shield
@@ -48,19 +50,32 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.edwin.bekal.presentation.loan.LoanApplicationViewModel
 import com.edwin.bekal.ui.theme.BekalTheme
 import com.edwin.bekal.ui.theme.Elevation
 import com.edwin.bekal.ui.theme.Radius
 import com.edwin.bekal.ui.theme.Spacing
+import java.math.BigDecimal
 import java.text.NumberFormat
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 @Composable
 fun SimulationScreen(
-    onBackClick: () -> Unit = {},
+    onNavigateToLogin: () -> Unit = {},
+    onNavigateToLoanApplication: (BigDecimal) -> Unit = {},
     onConfirmLoan: (String) -> Unit = {},
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    viewModel: LoanApplicationViewModel = hiltViewModel()
 ) {
+    val extendedColors = BekalTheme.extendedColors
+
+    // Auth State Check
+    val isLoggedIn by viewModel.isLoggedIn.collectAsStateWithLifecycle(initialValue = false)
+
     // Interactive State
     var amount by remember { mutableFloatStateOf(25_000_000f) }
     var selectedTenor by remember { mutableIntStateOf(12) }
@@ -72,15 +87,37 @@ fun SimulationScreen(
     val monthlyInstallment = totalRepayment / selectedTenor
 
     LazyColumn(
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier
+            .fillMaxSize()
+            .background(extendedColors.canvasBackground)
+            .statusBarsPadding(),
         contentPadding = PaddingValues(
-            top = Spacing.md,
+            top = Spacing.xs,
             start = Spacing.xl,
             end = Spacing.xl,
-            bottom = 96.dp // Menjaga agar tombol CTA dan catatan OJK dapat di-scroll sepenuhnya di atas floating navigation bar
+            bottom = 96.dp
         ),
         verticalArrangement = Arrangement.spacedBy(Spacing.lg)
     ) {
+        // --- Minimalist Text Header ---
+        item {
+            Column(
+                modifier = Modifier.padding(top = Spacing.xs, bottom = Spacing.xs)
+            ) {
+                Text(
+                    text = "Simulasi Pinjaman",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = extendedColors.deepCharcoal
+                )
+                Spacer(modifier = Modifier.height(Spacing.xxs))
+                Text(
+                    text = "Hitung estimasi cicilan & plafon sesuai kebutuhan Anda",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = extendedColors.textMuted
+                )
+            }
+        }
+
         // Card 1: Jumlah Pengajuan
         item {
             JumlahPengajuanCard(
@@ -101,15 +138,22 @@ fun SimulationScreen(
         item {
             EstimasiDetailCard(
                 amount = amount.toLong(),
-                monthlyInstallment = monthlyInstallment.toLong(),
-                totalRepayment = totalRepayment.toLong()
+                monthlyInstallment = monthlyInstallment.toLong()
             )
         }
 
         // CTA Button & Info Persetujuan
         item {
             ActionCtaSection(
-                onConfirmLoan = onConfirmLoan
+                onSubmit = {
+                    if (isLoggedIn) {
+                        val selectedPlafond = amount.toLong().toBigDecimal()
+                        onNavigateToLoanApplication(selectedPlafond)
+                        onConfirmLoan("LOAN-${System.currentTimeMillis()}")
+                    } else {
+                        onNavigateToLogin()
+                    }
+                }
             )
         }
     }
@@ -125,8 +169,8 @@ private fun JumlahPengajuanCard(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(Spacing.xxl),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        shape = RoundedCornerShape(Radius.xl),
+        colors = CardDefaults.cardColors(containerColor = extendedColors.surfaceCard),
         elevation = CardDefaults.cardElevation(defaultElevation = Elevation.none)
     ) {
         Column(
@@ -134,7 +178,6 @@ private fun JumlahPengajuanCard(
                 .fillMaxWidth()
                 .padding(Spacing.xl)
         ) {
-            // Header Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -172,7 +215,6 @@ private fun JumlahPengajuanCard(
 
             Spacer(modifier = Modifier.height(Spacing.lg))
 
-            // Display Box Nominal
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(Radius.xl),
@@ -199,10 +241,9 @@ private fun JumlahPengajuanCard(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Tombol Kurang
                         Surface(
                             shape = CircleShape,
-                            color = Color.White,
+                            color = extendedColors.surfaceCard,
                             modifier = Modifier
                                 .size(40.dp)
                                 .clip(CircleShape)
@@ -220,7 +261,6 @@ private fun JumlahPengajuanCard(
                             }
                         }
 
-                        // Nominal Text
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
                                 text = "Rp",
@@ -236,7 +276,6 @@ private fun JumlahPengajuanCard(
                             )
                         }
 
-                        // Tombol Tambah
                         Surface(
                             shape = CircleShape,
                             color = extendedColors.deepCharcoal,
@@ -262,7 +301,6 @@ private fun JumlahPengajuanCard(
 
             Spacer(modifier = Modifier.height(Spacing.lg))
 
-            // Slider Nominal
             Slider(
                 value = amount,
                 onValueChange = { onAmountChange(it) },
@@ -294,7 +332,6 @@ private fun JumlahPengajuanCard(
 
             Spacer(modifier = Modifier.height(Spacing.lg))
 
-            // Quick Selection Pills
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
@@ -339,8 +376,8 @@ private fun PilihTenorCard(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(Spacing.xxl),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        shape = RoundedCornerShape(Radius.xl),
+        colors = CardDefaults.cardColors(containerColor = extendedColors.surfaceCard),
         elevation = CardDefaults.cardElevation(defaultElevation = Elevation.none)
     ) {
         Column(
@@ -348,7 +385,6 @@ private fun PilihTenorCard(
                 .fillMaxWidth()
                 .padding(Spacing.xl)
         ) {
-            // Header Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -384,7 +420,6 @@ private fun PilihTenorCard(
 
             Spacer(modifier = Modifier.height(Spacing.lg))
 
-            // Tenor Grid
             val chunkedTenors = tenors.chunked(3)
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm + Spacing.xxs)) {
                 chunkedTenors.forEach { rowTenors ->
@@ -426,15 +461,17 @@ private fun PilihTenorCard(
 @Composable
 private fun EstimasiDetailCard(
     amount: Long,
-    monthlyInstallment: Long,
-    totalRepayment: Long
+    monthlyInstallment: Long
 ) {
     val extendedColors = BekalTheme.extendedColors
+    val todayFormatted = remember {
+        LocalDate.now().format(DateTimeFormatter.ofPattern("dd MMM yyyy", Locale("id", "ID")))
+    }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(Spacing.xxl),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        shape = RoundedCornerShape(Radius.xl),
+        colors = CardDefaults.cardColors(containerColor = extendedColors.surfaceCard),
         elevation = CardDefaults.cardElevation(defaultElevation = Elevation.none)
     ) {
         Column(
@@ -442,7 +479,6 @@ private fun EstimasiDetailCard(
                 .fillMaxWidth()
                 .padding(Spacing.xl)
         ) {
-            // Gradient Banner Top
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(Radius.xl),
@@ -520,7 +556,6 @@ private fun EstimasiDetailCard(
 
             Spacer(modifier = Modifier.height(Spacing.lg))
 
-            // Rincian Breakdown
             DetailRow(label = "Pokok Pinjaman", value = "Rp ${formatRupiah(amount)}")
 
             DetailRowWithBadge(
@@ -534,13 +569,10 @@ private fun EstimasiDetailCard(
                 badgeText = "Bebas Biaya (Rp 0)"
             )
 
-            DetailRow(label = "Total Pengembalian", value = "Rp ${formatRupiah(totalRepayment)}", isBold = true)
-
-            DetailRow(label = "Jatuh Tempo Pertama", value = "28 Des 2024")
+            DetailRow(label = "Jatuh Tempo Pertama", value = todayFormatted)
 
             Spacer(modifier = Modifier.height(Spacing.lg))
 
-            // OJK Information Box
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(Radius.lg),
@@ -588,7 +620,7 @@ private fun EstimasiDetailCard(
 
 @Composable
 private fun ActionCtaSection(
-    onConfirmLoan: (String) -> Unit
+    onSubmit: () -> Unit
 ) {
     val extendedColors = BekalTheme.extendedColors
 
@@ -597,7 +629,7 @@ private fun ActionCtaSection(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Button(
-            onClick = { onConfirmLoan("LOAN-${System.currentTimeMillis()}") },
+            onClick = onSubmit,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(54.dp),

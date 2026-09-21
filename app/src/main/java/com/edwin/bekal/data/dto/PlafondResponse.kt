@@ -28,6 +28,9 @@ data class PlafondResponse(
     @SerialName("status")
     val status: String,
 
+    @SerialName("creditTier")
+    val creditTier: String? = null,
+
     @SerialName("validFrom")
     val validFrom: String? = null,
 
