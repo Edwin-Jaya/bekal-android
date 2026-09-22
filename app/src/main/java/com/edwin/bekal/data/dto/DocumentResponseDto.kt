@@ -15,26 +15,8 @@ data class DocumentResponseDto(
     @SerialName("fileUrl")
     val fileUrl: String,
 
-    @SerialName("fileHash")
-    val fileHash: String? = null,
-
-    @SerialName("status")
-    val status: String,
-
-    @SerialName("verifiedBy")
-    val verifiedBy: InternalUserDto? = null,
-
-    @SerialName("verifiedAt")
-    val verifiedAt: String? = null,
-
-    @SerialName("rejectionReason")
-    val rejectionReason: String? = null,
-
     @SerialName("isLatest")
     val isLatest: Boolean,
-
-    @SerialName("uploadedAt")
-    val uploadedAt: String,
 
     @SerialName("createdAt")
     val createdAt: String? = null,

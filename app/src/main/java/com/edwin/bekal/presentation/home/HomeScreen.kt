@@ -1551,18 +1551,18 @@ private fun ConditionCCard(
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = "Lihat Rincian Cicilan",
-            fontSize = 12.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = extendedColors.electricViolet
-        )
-        Icon(
-            imageVector = Icons.Default.ChevronRight,
-            contentDescription = null,
-            tint = extendedColors.electricViolet,
-            modifier = Modifier.size(16.dp)
-        )
+//        Text(
+//            text = "Lihat Rincian Cicilan",
+//            fontSize = 12.sp,
+//            fontWeight = FontWeight.SemiBold,
+//            color = extendedColors.electricViolet
+//        )
+//        Icon(
+//            imageVector = Icons.Default.ChevronRight,
+//            contentDescription = null,
+//            tint = extendedColors.electricViolet,
+//            modifier = Modifier.size(16.dp)
+//        )
     }
 }
 
