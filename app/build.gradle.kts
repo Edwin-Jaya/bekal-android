@@ -34,7 +34,7 @@ android {
         versionCode = 1
         versionName = "1.0"
         buildConfigField(
-            "String", "BASE_URL", "\"http://192.168.70.121:8080/\""
+            "String", "BASE_URL", "\"https://bekal.morpkhai.web.id/\""
         )
         // 💡 Masukkan Web Client ID dari Google/Firebase Console di sini
         buildConfigField(

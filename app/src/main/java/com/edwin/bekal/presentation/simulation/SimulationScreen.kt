@@ -1,5 +1,6 @@
 package com.edwin.bekal.presentation.simulation
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -21,8 +22,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Wallet
@@ -37,6 +38,7 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -53,6 +55,8 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.edwin.bekal.presentation.loan.LoanApplicationViewModel
+import com.edwin.bekal.presentation.loan.LoanHistoryUiState
+import com.edwin.bekal.presentation.loan.PlafondUiState
 import com.edwin.bekal.ui.theme.BekalTheme
 import com.edwin.bekal.ui.theme.Elevation
 import com.edwin.bekal.ui.theme.Radius
@@ -73,18 +77,98 @@ fun SimulationScreen(
 ) {
     val extendedColors = BekalTheme.extendedColors
 
-    // Auth State Check
+    // Auth & Plafond State Check (selaras dengan LoanScreen.kt)
     val isLoggedIn by viewModel.isLoggedIn.collectAsStateWithLifecycle(initialValue = false)
+    val plafondState by viewModel.plafondState.collectAsStateWithLifecycle()
+    val historyState by viewModel.historyState.collectAsStateWithLifecycle()
+
+    LaunchedEffect(isLoggedIn) {
+        if (isLoggedIn) {
+            viewModel.loadActivePlafond()
+            viewModel.loadLoanHistory()
+        }
+    }
+
+    val activePlafond = (plafondState as? PlafondUiState.Success)?.plafond
+    val userTier = activePlafond?.creditTier
+
+    // Plafond limit bounds
+    val isPlafondZero = isLoggedIn && activePlafond != null && activePlafond.availableAmount <= BigDecimal.ZERO
+    val minLimit = 1_000_000f
+    val maxLimit = if (isLoggedIn && activePlafond != null) {
+        maxOf(minLimit, activePlafond.availableAmount.toFloat())
+    } else {
+        50_000_000f
+    }
+
+    // Pending application check (sama persis dengan LoanScreen.kt)
+    val hasPendingApplication = (historyState as? LoanHistoryUiState.Success)
+        ?.applications
+        ?.any { application ->
+            application.status.lowercase() in listOf("in_review", "in_approval", "in_disbursement", "pending", "under_review", "diproses", "disbursed")
+        } == true
+
+    // Quick amounts calculation disesuaikan dengan plafon maksimal
+    val quickAmounts = remember(maxLimit) {
+        if (maxLimit <= 10_000_000f) {
+            val step = maxLimit / 4f
+            listOf(step, step * 2, step * 3, maxLimit).map {
+                (it / 500_000).toInt() * 500_000f
+            }.distinct().filter { it >= 1_000_000f }.let { list ->
+                if (list.isEmpty()) listOf(maxLimit) else list
+            }
+        } else if (maxLimit == 50_000_000f) {
+            listOf(10_000_000f, 25_000_000f, 35_000_000f, 50_000_000f)
+        } else {
+            listOf(
+                maxLimit * 0.25f,
+                maxLimit * 0.5f,
+                maxLimit * 0.75f,
+                maxLimit
+            ).map { (it / 1_000_000).toInt() * 1_000_000f }.distinct().filter { it >= 1_000_000f }.let { list ->
+                if (list.isEmpty()) listOf(maxLimit) else list
+            }
+        }
+    }
 
     // Interactive State
     var amount by remember { mutableFloatStateOf(25_000_000f) }
     var selectedTenor by remember { mutableIntStateOf(12) }
 
-    // Calculations
-    val dailyInterestRate = 0.001f // 0.1% per hari
-    val totalInterest = amount * dailyInterestRate * 30 * selectedTenor
-    val totalRepayment = amount + totalInterest
-    val monthlyInstallment = totalRepayment / selectedTenor
+    // Sinkronkan nominal pinjaman saat batas limit plafon berubah
+    LaunchedEffect(maxLimit) {
+        if (amount > maxLimit) {
+            amount = maxLimit
+        } else if (amount < minLimit) {
+            amount = minLimit
+        }
+    }
+
+    // Filter tenor yang tersedia berdasarkan batas maxTenorMonths pada plafon
+    val maxTenor = activePlafond?.maxTenorMonths ?: 24
+    val availableTenors = remember(maxTenor) {
+        listOf(6, 8, 12, 16, 20, 24).filter { it <= maxTenor }
+    }
+    LaunchedEffect(availableTenors) {
+        if (selectedTenor !in availableTenors && availableTenors.isNotEmpty()) {
+            selectedTenor = availableTenors.last()
+        }
+    }
+
+    // Suku bunga & Perhitungan cicilan bulanan (1% per bulan flat, selaras 100% dengan LoanApplicationServiceImpl.java)
+    val interestRateBd = activePlafond?.interestRate ?: BigDecimal("1.0")
+    val amountBd = amount.toLong().toBigDecimal()
+    val tenorBd = selectedTenor.toBigDecimal()
+
+    val totalInterest = amountBd
+        .multiply(interestRateBd)
+        .divide(BigDecimal.valueOf(100), 10, java.math.RoundingMode.HALF_UP)
+        .multiply(tenorBd)
+
+    val totalRepayment = amountBd.add(totalInterest).setScale(2, java.math.RoundingMode.HALF_UP)
+    val monthlyInstallment = totalRepayment.divide(tenorBd, 2, java.math.RoundingMode.HALF_UP)
+
+    val interestRateFormatted = "${interestRateBd.stripTrailingZeros().toPlainString()}% / bulan"
 
     LazyColumn(
         modifier = modifier
@@ -118,10 +202,22 @@ fun SimulationScreen(
             }
         }
 
+        // Banner Penguncian Pengajuan (sama seperti LoanScreen)
+        if (hasPendingApplication) {
+            item {
+                ApplicationLockBanner()
+            }
+        }
+
         // Card 1: Jumlah Pengajuan
         item {
             JumlahPengajuanCard(
                 amount = amount,
+                minAmount = minLimit,
+                maxAmount = maxLimit,
+                quickAmounts = quickAmounts,
+                isPlafondZero = isPlafondZero,
+                userTier = userTier,
                 onAmountChange = { amount = it }
             )
         }
@@ -130,6 +226,7 @@ fun SimulationScreen(
         item {
             PilihTenorCard(
                 selectedTenor = selectedTenor,
+                availableTenors = availableTenors,
                 onTenorSelected = { selectedTenor = it }
             )
         }
@@ -138,7 +235,8 @@ fun SimulationScreen(
         item {
             EstimasiDetailCard(
                 amount = amount.toLong(),
-                monthlyInstallment = monthlyInstallment.toLong()
+                monthlyInstallment = monthlyInstallment.toLong(),
+                rateText = interestRateFormatted
             )
         }
 
@@ -147,13 +245,52 @@ fun SimulationScreen(
             ActionCtaSection(
                 onSubmit = {
                     if (isLoggedIn) {
-                        val selectedPlafond = amount.toLong().toBigDecimal()
-                        onNavigateToLoanApplication(selectedPlafond)
+                        val limitToPass = activePlafond?.availableAmount ?: amount.toLong().toBigDecimal()
+                        onNavigateToLoanApplication(limitToPass)
                         onConfirmLoan("LOAN-${System.currentTimeMillis()}")
                     } else {
                         onNavigateToLogin()
                     }
-                }
+                },
+                hasPendingApplication = hasPendingApplication,
+                isPlafondZero = isPlafondZero,
+                isLoggedIn = isLoggedIn
+            )
+        }
+    }
+}
+
+// ==========================================
+// APPLICATION LOCK BANNER (SAMA PERSIS DENGAN LOAN SCREEN)
+// ==========================================
+@Composable
+private fun ApplicationLockBanner() {
+    val extendedColors = BekalTheme.extendedColors
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(Radius.lg),
+        color = extendedColors.warningSoft,
+        border = BorderStroke(1.dp, extendedColors.warningMain.copy(alpha = 0.3f))
+    ) {
+        Row(
+            modifier = Modifier.padding(Spacing.md),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.Lock,
+                contentDescription = null,
+                tint = extendedColors.warningMain,
+                modifier = Modifier.size(16.dp)
+            )
+
+            Spacer(modifier = Modifier.width(Spacing.sm))
+
+            Text(
+                text = "Pengajuan baru dikunci hingga verifikasi aktif selesai.",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                color = extendedColors.warningMain
             )
         }
     }
@@ -162,10 +299,14 @@ fun SimulationScreen(
 @Composable
 private fun JumlahPengajuanCard(
     amount: Float,
+    minAmount: Float,
+    maxAmount: Float,
+    quickAmounts: List<Float>,
+    isPlafondZero: Boolean,
+    userTier: String?,
     onAmountChange: (Float) -> Unit
 ) {
     val extendedColors = BekalTheme.extendedColors
-    val quickAmounts = listOf(10_000_000f, 25_000_000f, 35_000_000f, 50_000_000f)
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -184,16 +325,33 @@ private fun JumlahPengajuanCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "Jumlah Pengajuan",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = extendedColors.deepCharcoal
+                        )
+                        if (userTier != null) {
+                            Spacer(modifier = Modifier.width(Spacing.xs))
+                            Surface(
+                                shape = CircleShape,
+                                color = extendedColors.accentSoft
+                            ) {
+                                Text(
+                                    text = userTier.replace("TIER_", "Tier "),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = extendedColors.electricViolet,
+                                    modifier = Modifier.padding(horizontal = Spacing.sm, vertical = 2.dp)
+                                )
+                            }
+                        }
+                    }
                     Text(
-                        text = "Jumlah Pengajuan",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = extendedColors.deepCharcoal
-                    )
-                    Text(
-                        text = "Tentukan plafon yang dibutuhkan",
+                        text = if (isPlafondZero) "Plafond aktif telah terpakai seluruhnya" else "Tentukan nominal dalam batas plafon aktif",
                         fontSize = 12.sp,
-                        color = extendedColors.textMuted
+                        color = if (isPlafondZero) extendedColors.dangerMain else extendedColors.textMuted
                     )
                 }
 
@@ -247,15 +405,15 @@ private fun JumlahPengajuanCard(
                             modifier = Modifier
                                 .size(40.dp)
                                 .clip(CircleShape)
-                                .clickable {
-                                    if (amount > 1_000_000f) onAmountChange(amount - 1_000_000f)
+                                .clickable(enabled = !isPlafondZero && amount > minAmount) {
+                                    onAmountChange((amount - 1_000_000f).coerceAtLeast(minAmount))
                                 }
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     imageVector = Icons.Default.Remove,
                                     contentDescription = "Kurang",
-                                    tint = extendedColors.deepCharcoal,
+                                    tint = if (!isPlafondZero && amount > minAmount) extendedColors.deepCharcoal else extendedColors.textMuted.copy(alpha = 0.4f),
                                     modifier = Modifier.size(18.dp)
                                 )
                             }
@@ -278,19 +436,19 @@ private fun JumlahPengajuanCard(
 
                         Surface(
                             shape = CircleShape,
-                            color = extendedColors.deepCharcoal,
+                            color = if (!isPlafondZero && amount < maxAmount) extendedColors.deepCharcoal else extendedColors.surfaceCard,
                             modifier = Modifier
                                 .size(40.dp)
                                 .clip(CircleShape)
-                                .clickable {
-                                    if (amount < 50_000_000f) onAmountChange(amount + 1_000_000f)
+                                .clickable(enabled = !isPlafondZero && amount < maxAmount) {
+                                    onAmountChange((amount + 1_000_000f).coerceAtMost(maxAmount))
                                 }
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     imageVector = Icons.Default.Add,
                                     contentDescription = "Tambah",
-                                    tint = Color.White,
+                                    tint = if (!isPlafondZero && amount < maxAmount) Color.White else extendedColors.textMuted.copy(alpha = 0.4f),
                                     modifier = Modifier.size(18.dp)
                                 )
                             }
@@ -301,11 +459,13 @@ private fun JumlahPengajuanCard(
 
             Spacer(modifier = Modifier.height(Spacing.lg))
 
+            val stepsCount = ((maxAmount - minAmount) / 1_000_000f).toInt().coerceAtLeast(0) - 1
             Slider(
-                value = amount,
+                value = amount.coerceIn(minAmount, maxAmount),
                 onValueChange = { onAmountChange(it) },
-                valueRange = 1_000_000f..50_000_000f,
-                steps = 48,
+                valueRange = minAmount..maxAmount,
+                steps = if (stepsCount > 0) stepsCount else 0,
+                enabled = !isPlafondZero && maxAmount > minAmount,
                 colors = SliderDefaults.colors(
                     thumbColor = extendedColors.electricViolet,
                     activeTrackColor = extendedColors.electricViolet,
@@ -319,12 +479,12 @@ private fun JumlahPengajuanCard(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "Min Rp 1.000.000",
+                    text = "Min Rp ${formatRupiah(minAmount.toLong())}",
                     fontSize = 11.sp,
                     color = extendedColors.textMuted
                 )
                 Text(
-                    text = "Maks Rp 50.000.000",
+                    text = "Maks Rp ${formatRupiah(maxAmount.toLong())}",
                     fontSize = 11.sp,
                     color = extendedColors.textMuted
                 )
@@ -338,13 +498,18 @@ private fun JumlahPengajuanCard(
             ) {
                 quickAmounts.forEach { value ->
                     val isSelected = amount == value
-                    val label = "${(value / 1_000_000).toInt()} Juta"
+                    val label = if (value >= 1_000_000f) {
+                        val millions = value / 1_000_000f
+                        if (millions % 1f == 0f) "${millions.toInt()} Juta" else String.format(Locale.US, "%.1f Jt", millions)
+                    } else {
+                        "${(value / 1_000f).toInt()} Rb"
+                    }
 
                     Surface(
                         modifier = Modifier
                             .weight(1f)
                             .clip(CircleShape)
-                            .clickable { onAmountChange(value) },
+                            .clickable(enabled = !isPlafondZero) { onAmountChange(value) },
                         shape = CircleShape,
                         color = if (isSelected) extendedColors.electricViolet else extendedColors.canvasBackground
                     ) {
@@ -369,10 +534,10 @@ private fun JumlahPengajuanCard(
 @Composable
 private fun PilihTenorCard(
     selectedTenor: Int,
+    availableTenors: List<Int>,
     onTenorSelected: (Int) -> Unit
 ) {
     val extendedColors = BekalTheme.extendedColors
-    val tenors = listOf(6, 8, 12, 16, 20, 24)
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -420,7 +585,7 @@ private fun PilihTenorCard(
 
             Spacer(modifier = Modifier.height(Spacing.lg))
 
-            val chunkedTenors = tenors.chunked(3)
+            val chunkedTenors = availableTenors.chunked(3)
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm + Spacing.xxs)) {
                 chunkedTenors.forEach { rowTenors ->
                     Row(
@@ -461,7 +626,8 @@ private fun PilihTenorCard(
 @Composable
 private fun EstimasiDetailCard(
     amount: Long,
-    monthlyInstallment: Long
+    monthlyInstallment: Long,
+    rateText: String
 ) {
     val extendedColors = BekalTheme.extendedColors
     val todayFormatted = remember {
@@ -546,7 +712,7 @@ private fun EstimasiDetailCard(
                         Spacer(modifier = Modifier.height(Spacing.xxs))
 
                         Text(
-                            text = "Sudah mencakup pokok & bunga harian",
+                            text = "Sudah mencakup pokok & bunga bulanan",
                             fontSize = 11.sp,
                             color = Color.White.copy(alpha = 0.7f)
                         )
@@ -559,8 +725,8 @@ private fun EstimasiDetailCard(
             DetailRow(label = "Pokok Pinjaman", value = "Rp ${formatRupiah(amount)}")
 
             DetailRowWithBadge(
-                label = "Suku Bunga Harian",
-                value = "0.1% / hari",
+                label = "Suku Bunga",
+                value = rateText,
                 icon = Icons.Default.CheckCircle
             )
 
@@ -620,9 +786,13 @@ private fun EstimasiDetailCard(
 
 @Composable
 private fun ActionCtaSection(
-    onSubmit: () -> Unit
+    onSubmit: () -> Unit,
+    hasPendingApplication: Boolean,
+    isPlafondZero: Boolean,
+    isLoggedIn: Boolean
 ) {
     val extendedColors = BekalTheme.extendedColors
+    val isEnabled = !hasPendingApplication && (!isLoggedIn || !isPlafondZero)
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -630,13 +800,16 @@ private fun ActionCtaSection(
     ) {
         Button(
             onClick = onSubmit,
+            enabled = isEnabled,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(54.dp),
             shape = CircleShape,
             colors = ButtonDefaults.buttonColors(
                 containerColor = extendedColors.deepCharcoal,
-                contentColor = Color.White
+                contentColor = Color.White,
+                disabledContainerColor = extendedColors.textMuted.copy(alpha = 0.2f),
+                disabledContentColor = extendedColors.textMuted
             )
         ) {
             Row(
@@ -644,23 +817,34 @@ private fun ActionCtaSection(
                 horizontalArrangement = Arrangement.Center
             ) {
                 Text(
-                    text = "Lanjutkan Pengajuan Pinjaman",
+                    text = when {
+                        hasPendingApplication -> "Pengajuan Sedang Diproses"
+                        isPlafondZero -> "Limit Plafon Habis"
+                        !isLoggedIn -> "Masuk untuk Mengajukan Pinjaman"
+                        else -> "Lanjutkan Pengajuan Pinjaman"
+                    },
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold
                 )
-                Spacer(modifier = Modifier.width(Spacing.sm))
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
-                )
+                if (isEnabled) {
+                    Spacer(modifier = Modifier.width(Spacing.sm))
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
         }
 
         Spacer(modifier = Modifier.height(Spacing.sm))
 
         Text(
-            text = "Persetujuan instan dalam 15 menit melalui e-KTP valid",
+            text = if (hasPendingApplication) {
+                "Selesaikan verifikasi pengajuan aktif sebelum mengajukan kembali"
+            } else {
+                "Persetujuan instan dalam 15 menit melalui e-KTP valid"
+            },
             fontSize = 11.sp,
             color = extendedColors.textMuted
         )
