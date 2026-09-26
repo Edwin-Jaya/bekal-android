@@ -28,6 +28,9 @@ import org.junit.experimental.runners.Enclosed
 import org.junit.runner.RunWith
 
 
+import com.google.firebase.auth.FirebaseAuth
+import com.edwin.bekal.data.home.HomeRepository
+
 private const val TOKEN = "header.payload.signature"
 
 private const val NOW = 1_700_000_000_000L
@@ -38,14 +41,18 @@ private fun authRepository(
     customerApi: CustomerApi = mockk(),
     json: Json = Json { ignoreUnknownKeys = true },
     ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
-    clock: () -> Long = { com.edwin.bekal.data.auth.NOW }
+    clock: () -> Long = { com.edwin.bekal.data.auth.NOW },
+    firebaseAuth: FirebaseAuth = mockk(relaxed = true),
+    homeRepository: HomeRepository = mockk(relaxed = true)
 ) = AuthRepository(
     localDataSource = localDataSource,
     remoteDataSource = remoteDataSource,
     customerApi = customerApi,
     json = json,
     ioDispatcher = ioDispatcher,
-    clock = clock
+    clock = clock,
+    firebaseAuth = firebaseAuth,
+    homeRepository = homeRepository
 )
 
 private fun storedSession(expiresAtMillis: Long) =
@@ -118,7 +125,118 @@ class AuthRepositoryTest{
             val session = repository.observeSession().first()
 
             assertEquals(stored, session)
+        }
+    }
 
+    class Logout {
+        private val localDataSource = mockk<AuthSessionLocalDataSource>(relaxUnitFun = true)
+        private val homeRepository = mockk<HomeRepository>(relaxUnitFun = true)
+        private val repository = authRepository(
+            localDataSource = localDataSource,
+            homeRepository = homeRepository
+        )
+
+        @Test
+        fun `logout clears home cache and local session`() = runTest {
+            repository.logout()
+
+            io.mockk.coVerify(exactly = 1) { homeRepository.clearCache() }
+            io.mockk.coVerify(exactly = 1) { localDataSource.clear() }
+        }
+    }
+
+    class Register {
+        private val remoteDataSource = mockk<AuthApi>()
+        private val repository = authRepository(remoteDataSource = remoteDataSource)
+
+        private val sampleRegisterDto = com.edwin.bekal.data.dto.RegisterRequestDto(
+            email = "test@example.com",
+            password = "Password123!",
+            fullName = "Edwin Jaya",
+            phoneNumber = "081234567890",
+            nik = "1234567890123456",
+            dateOfBirth = "1995-08-15",
+            gender = "MALE",
+            address = "Jl. Merdeka No. 1",
+            employmentType = "karyawan_tetap",
+            companyName = "PT BCA Finance",
+            jobTitle = "Software Engineer",
+            industry = "Financial Services",
+            declaredIncome = 15000000.0,
+            otherIncome = 0.0,
+            employmentStartDate = "2020-01-01"
+        )
+
+        private val sampleProfile = com.edwin.bekal.data.dto.CustomerProfileDto(
+            id = "cust-1",
+            fullName = "Edwin Jaya",
+            email = "test@example.com"
+        )
+
+        @Test
+        fun `register success returns customer profile`() = runTest {
+            coEvery { remoteDataSource.register(sampleRegisterDto) } returns ApiEnvelope(
+                status = 201,
+                success = true,
+                message = "Created",
+                data = sampleProfile
+            )
+
+            val result = repository.register(sampleRegisterDto)
+
+            assertTrue(result is AppResult.Success)
+            assertEquals("cust-1", (result as AppResult.Success).data.id)
+        }
+
+        @Test
+        fun `register failure returns error`() = runTest {
+            coEvery { remoteDataSource.register(sampleRegisterDto) } returns ApiEnvelope(
+                status = 400,
+                success = false,
+                message = "Email already registered",
+                data = null
+            )
+
+            val result = repository.register(sampleRegisterDto)
+
+            assertTrue(result is AppResult.Failure)
+        }
+    }
+
+    class ForgotPassword {
+        private val remoteDataSource = mockk<AuthApi>()
+        private val repository = authRepository(remoteDataSource = remoteDataSource)
+
+        @Test
+        fun `forgotPassword success returns AppResult Success`() = runTest {
+            coEvery {
+                remoteDataSource.forgotPassword(com.edwin.bekal.data.dto.ForgotPasswordRequestDto("user@example.com"))
+            } returns ApiEnvelope(
+                status = 200,
+                success = true,
+                message = "OTP sent",
+                data = null
+            )
+
+            val result = repository.forgotPassword("user@example.com")
+
+            assertTrue(result is AppResult.Success)
+        }
+
+        @Test
+        fun `forgotPassword failure returns AppResult Failure`() = runTest {
+            coEvery {
+                remoteDataSource.forgotPassword(com.edwin.bekal.data.dto.ForgotPasswordRequestDto("user@example.com"))
+            } returns ApiEnvelope(
+                status = 404,
+                success = false,
+                message = "User not found",
+                data = null
+            )
+
+            val result = repository.forgotPassword("user@example.com")
+
+            assertTrue(result is AppResult.Failure)
         }
     }
 }
