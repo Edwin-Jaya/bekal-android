@@ -1,9 +1,5 @@
 package com.edwin.bekal.presentation.main
 
-import android.Manifest
-import android.os.Build
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
@@ -63,25 +59,11 @@ fun MainScreen(
             )
         } == true
 
-    // 2. Request Notification Permission & Muat Data saat Login
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        val permissionLauncher = rememberLauncherForActivityResult(
-            contract = ActivityResultContracts.RequestPermission()
-        ) { isGranted -> }
-
-        LaunchedEffect(isLoggedIn) {
-            if (isLoggedIn) {
-                permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                loanApplicationViewModel.loadActivePlafond()
-                loanApplicationViewModel.loadLoanHistory()
-            }
-        }
-    } else {
-        LaunchedEffect(isLoggedIn) {
-            if (isLoggedIn) {
-                loanApplicationViewModel.loadActivePlafond()
-                loanApplicationViewModel.loadLoanHistory()
-            }
+    // 2. Muat Data saat Login
+    LaunchedEffect(isLoggedIn) {
+        if (isLoggedIn) {
+            loanApplicationViewModel.loadActivePlafond()
+            loanApplicationViewModel.loadLoanHistory()
         }
     }
 

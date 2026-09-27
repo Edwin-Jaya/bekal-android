@@ -1,10 +1,14 @@
 package com.edwin.bekal.presentation.auth.register.steps
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.util.Log
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -104,6 +108,22 @@ fun StepIdentityContent(
             } else {
                 Log.e("StepIdentityContent", "Failed to copy camera uri to cache: $tempCameraUri")
             }
+        }
+    }
+
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            val uri = createTempImageUri(context)
+            tempCameraUri = uri
+            cameraLauncher.launch(uri)
+        } else {
+            Toast.makeText(
+                context,
+                "Izin kamera diperlukan untuk mengambil foto e-KTP",
+                Toast.LENGTH_SHORT
+            ).show()
         }
     }
 
@@ -233,9 +253,18 @@ fun StepIdentityContent(
                 Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
                     OutlinedButton(
                         onClick = {
-                            val uri = createTempImageUri(context)
-                            tempCameraUri = uri
-                            cameraLauncher.launch(uri)
+                            val hasCameraPermission = ContextCompat.checkSelfPermission(
+                                context,
+                                Manifest.permission.CAMERA
+                            ) == PackageManager.PERMISSION_GRANTED
+
+                            if (hasCameraPermission) {
+                                val uri = createTempImageUri(context)
+                                tempCameraUri = uri
+                                cameraLauncher.launch(uri)
+                            } else {
+                                cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                            }
                         },
                         modifier = Modifier
                             .weight(1f)

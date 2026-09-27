@@ -31,6 +31,13 @@ object AuthModule {
 
     @Provides
     @Singleton
+    fun provideAppPreferencesLocalDataSource(
+        @ApplicationContext context: Context,
+    ): com.edwin.bekal.data.local.AppPreferencesLocalDataSource =
+        com.edwin.bekal.data.local.AppPreferencesLocalDataSource(context)
+
+    @Provides
+    @Singleton
     fun provideAuthRepository(
         localDataSource: AuthSessionLocalDataSource,
         authApi: AuthApi,
