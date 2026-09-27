@@ -14,7 +14,8 @@ import javax.inject.Singleton
 @Singleton
 class RootDetectorImpl @Inject constructor(
     @param:ApplicationContext private val context: Context,
-    private val rootBeer: RootBeer
+    private val rootBeer: RootBeer,
+    private val shellExecutor: ShellCommandExecutor
 ) : RootDetector {
 
     override fun isRooted(): Boolean {
@@ -141,17 +142,7 @@ class RootDetectorImpl @Inject constructor(
     }
 
     private fun checkSuExecution(): Boolean {
-        var process: Process? = null
-        return try {
-            process = Runtime.getRuntime().exec(arrayOf("which", "su"))
-            val reader = BufferedReader(InputStreamReader(process.inputStream))
-            val line = reader.readLine()
-            line != null && line.isNotEmpty()
-        } catch (_: Throwable) {
-            false
-        } finally {
-            process?.destroy()
-        }
+        return shellExecutor.canExecuteSu()
     }
 
     private fun checkRwMounts(): Boolean {

@@ -97,7 +97,6 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.navigation.compose)
-    implementation(libs.androidx.ui.test.junit4)
     implementation(libs.firebase.crashlytics.buildtools)
     implementation(libs.firebase.messaging)
     implementation(libs.kotlinx.serialization.json)

@@ -16,6 +16,7 @@ class RootDetectorTest {
     private val context = mockk<Context>(relaxed = true)
     private val packageManager = mockk<PackageManager>(relaxed = true)
     private val rootBeer = mockk<RootBeer>(relaxed = true)
+    private val shellExecutor = mockk<ShellCommandExecutor>(relaxed = true)
 
     private lateinit var rootDetector: RootDetectorImpl
 
@@ -26,8 +27,9 @@ class RootDetectorTest {
         every {
             packageManager.getPackageInfo(any<String>(), any<Int>())
         } throws PackageManager.NameNotFoundException()
+        every { shellExecutor.canExecuteSu() } returns false
 
-        rootDetector = RootDetectorImpl(context, rootBeer)
+        rootDetector = RootDetectorImpl(context, rootBeer, shellExecutor)
     }
 
     @Test
@@ -70,5 +72,24 @@ class RootDetectorTest {
 
         assertFalse(result.isRooted)
         assertTrue(result.detectedThreats.isEmpty())
+    }
+
+    @Test
+    fun `when su execution succeeds, isRooted returns true`() {
+        every { shellExecutor.canExecuteSu() } returns true
+
+        val isRooted = rootDetector.isRooted()
+
+        assertTrue(isRooted)
+    }
+
+    @Test
+    fun `when su execution succeeds, getRootDetectionResult flags su threat`() {
+        every { shellExecutor.canExecuteSu() } returns true
+
+        val result = rootDetector.getRootDetectionResult()
+
+        assertTrue(result.isRooted)
+        assertTrue(result.detectedThreats.any { it.contains("Execution of 'su'") })
     }
 }

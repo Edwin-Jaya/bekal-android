@@ -1,8 +1,10 @@
 package com.edwin.bekal.di
 
 import android.content.Context
+import com.edwin.bekal.core.security.DefaultShellCommandExecutor
 import com.edwin.bekal.core.security.RootDetector
 import com.edwin.bekal.core.security.RootDetectorImpl
+import com.edwin.bekal.core.security.ShellCommandExecutor
 import com.scottyab.rootbeer.RootBeer
 import dagger.Binds
 import dagger.Module
@@ -21,6 +23,12 @@ abstract class SecurityModule {
     abstract fun bindRootDetector(
         rootDetectorImpl: RootDetectorImpl
     ): RootDetector
+
+    @Binds
+    @Singleton
+    abstract fun bindShellCommandExecutor(
+        defaultShellCommandExecutor: DefaultShellCommandExecutor
+    ): ShellCommandExecutor
 
     companion object {
         @Provides
