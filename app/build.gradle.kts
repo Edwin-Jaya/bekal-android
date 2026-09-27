@@ -111,7 +111,9 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.coil.compose)
+    implementation(libs.rootbeer.lib)
     ksp(libs.androidx.room.compiler)
+
 
     // Firebase BoM platform & Libraries
     implementation(platform(libs.firebase.bom))

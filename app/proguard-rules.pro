@@ -42,3 +42,9 @@
 -dontwarn com.google.firebase.crashlytics.buildtools.**
 -dontwarn javax.servlet.**
 -dontwarn org.ietf.jgss.**
+
+# RootBeer & Root Detection
+-keep class com.scottyab.rootbeer.** { *; }
+-dontwarn com.scottyab.rootbeer.**
+-keep class com.edwin.bekal.core.security.** { *; }
+
