@@ -145,6 +145,11 @@ class LoanApplicationViewModel @Inject constructor(
                 return@launch
             }
 
+            if (amountRequested < BigDecimal("2000000.00")) {
+                _uiState.value = LoanApplicationUiState.Error("Jumlah pengajuan tidak boleh kurang dari Rp2.000.000")
+                return@launch
+            }
+
             if (amountRequested > currentPlafond.availableAmount) {
                 _uiState.value = LoanApplicationUiState.Error("Jumlah pengajuan melebihi sisa plafond aktif Anda")
                 return@launch
