@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -53,6 +54,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -247,9 +249,14 @@ fun EditProfileScreen(
 
                             OutlinedTextField(
                                 value = phoneNumber,
-                                onValueChange = { viewModel.phoneNumber.value = it },
+                                onValueChange = { input ->
+                                    if (input.all { it.isDigit() } && input.length <= 13) {
+                                        viewModel.phoneNumber.value = input
+                                    }
+                                },
                                 label = { Text("Nomor Handphone", fontSize = 12.sp) },
                                 prefix = { Text("+62 ", fontSize = 12.sp, fontWeight = FontWeight.Bold) },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(Radius.lg),
                                 singleLine = true,

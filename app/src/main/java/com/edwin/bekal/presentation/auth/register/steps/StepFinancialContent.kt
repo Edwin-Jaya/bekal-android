@@ -81,7 +81,7 @@ fun StepFinancialContent(
     }
 
     val documentLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetMultipleContents()
+        contract = ActivityResultContracts.OpenMultipleDocuments()
     ) { uris: List<Uri> ->
         if (uris.isNotEmpty()) {
             val currentList = uiState.paySlipPaths.toMutableList()
@@ -89,9 +89,19 @@ fun StepFinancialContent(
             uris.forEach { uri ->
                 if (currentList.size >= 3) return@forEach
 
-                val extension = context.contentResolver.getType(uri)
-                    ?.substringAfterLast('/')
-                    ?: "pdf"
+                val type = context.contentResolver.getType(uri) ?: ""
+                val fileName = getFileNameFromUri(context, uri) ?: ""
+                val extFromName = fileName.substringAfterLast('.', "").lowercase()
+
+                val isImage = type.startsWith("image/") || extFromName in listOf("jpg", "jpeg", "png", "webp")
+                val isPdf = type == "application/pdf" || extFromName == "pdf"
+
+                if (!isImage && !isPdf) {
+                    Log.w("StepFinancialContent", "File format not supported: $uri ($type)")
+                    return@forEach
+                }
+
+                val extension = if (isPdf) "pdf" else (extFromName.ifBlank { "jpg" })
 
                 val localPath = uri.copyToAppCache(context, prefix = "payslip_", extension = extension)
 
@@ -213,7 +223,7 @@ fun StepFinancialContent(
 
                 if (uiState.paySlipPaths.size < 3) {
                     OutlinedButton(
-                        onClick = { documentLauncher.launch("*/*") },
+                        onClick = { documentLauncher.launch(arrayOf("image/*", "application/pdf")) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(48.dp),

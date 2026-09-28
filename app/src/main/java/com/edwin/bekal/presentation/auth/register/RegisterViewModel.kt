@@ -79,7 +79,7 @@ class RegisterViewModel @Inject constructor(
     }
 
     fun onPhoneNumberChange(phone: String) {
-        val digitsOnly = phone.filter { it.isDigit() }
+        val digitsOnly = phone.filter { it.isDigit() }.take(13)
         _uiState.update {
             it.copy(
                 phoneNumber = digitsOnly,
@@ -183,6 +183,10 @@ class RegisterViewModel @Inject constructor(
 
     fun onMonthlyIncomeChange(value: String) {
         val digitsOnly = value.filter { it.isDigit() }
+        val amount = digitsOnly.toLongOrNull() ?: 0L
+        if (digitsOnly.isNotEmpty() && amount > 2_000_000_000L) {
+            return
+        }
         _uiState.update {
             it.copy(
                 monthlyIncome = digitsOnly,
@@ -193,6 +197,10 @@ class RegisterViewModel @Inject constructor(
 
     fun onOtherIncomeChange(value: String) {
         val digitsOnly = value.filter { it.isDigit() }
+        val amount = digitsOnly.toLongOrNull() ?: 0L
+        if (digitsOnly.isNotEmpty() && amount > 2_000_000_000L) {
+            return
+        }
         _uiState.update { it.copy(otherIncome = digitsOnly) }
     }
 
@@ -265,6 +273,7 @@ class RegisterViewModel @Inject constructor(
         val phoneNumberError = when {
             currentState.phoneNumber.isBlank() -> "Nomor handphone wajib diisi"
             currentState.phoneNumber.length < 9 -> "Nomor handphone tidak valid"
+            currentState.phoneNumber.length > 13 -> "Nomor handphone maksimal 13 digit"
             else -> null
         }
 
@@ -379,6 +388,7 @@ class RegisterViewModel @Inject constructor(
         val monthlyIncomeError = when {
             currentState.monthlyIncome.isBlank() -> "Pendapatan bersih bulanan wajib diisi"
             incomeAmount <= 0 -> "Pendapatan harus lebih dari Rp 0"
+            incomeAmount > 2_000_000_000L -> "Pendapatan maksimal Rp 2.000.000.000"
             else -> null
         }
 
