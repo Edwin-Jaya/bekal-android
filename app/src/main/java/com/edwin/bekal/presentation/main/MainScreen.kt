@@ -90,6 +90,11 @@ fun MainScreen(
                         return@BekalBottomNavigation
                     }
 
+                    if (targetTab == BottomTabRoute.Loans && isLoggedIn) {
+                        loanApplicationViewModel.loadLoanHistory(isSilent = true)
+                        loanApplicationViewModel.loadActivePlafond(isSilent = true)
+                    }
+
                     bottomNavController.navigate(targetTab) {
                         popUpTo(bottomNavController.graph.findStartDestination().id) {
                             saveState = true
@@ -102,6 +107,8 @@ fun MainScreen(
                     if (!isLoggedIn) {
                         onNavigateToLogin()
                     } else if (hasActiveApplication) {
+                        loanApplicationViewModel.loadLoanHistory(isSilent = true)
+                        loanApplicationViewModel.loadActivePlafond(isSilent = true)
                         bottomNavController.navigate(BottomTabRoute.Loans) {
                             popUpTo(bottomNavController.graph.findStartDestination().id) {
                                 saveState = true
@@ -135,6 +142,8 @@ fun MainScreen(
                         }
                     },
                     onNavigateToHistory = {
+                        loanApplicationViewModel.loadLoanHistory(isSilent = true)
+                        loanApplicationViewModel.loadActivePlafond(isSilent = true)
                         bottomNavController.navigate(BottomTabRoute.Loans) {
                             popUpTo(bottomNavController.graph.findStartDestination().id) { saveState = true }
                             launchSingleTop = true
@@ -165,7 +174,8 @@ fun MainScreen(
                     onNavigateToDetail = onNavigateToDetail,
                     onNavigateToPayment = onNavigateToPayment,
                     onNavigateToLoanApplication = onNavigateToLoanApplication,
-                    onNavigateToLogin = onNavigateToLogin
+                    onNavigateToLogin = onNavigateToLogin,
+                    viewModel = loanApplicationViewModel
                 )
             }
 

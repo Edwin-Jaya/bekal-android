@@ -229,7 +229,10 @@ fun LoansScreen(
                                 )
                             }
                         } else {
-                            items(state.applications) { application ->
+                            items(
+                                items = state.applications,
+                                key = { "${it.id}_${it.status}" }
+                            ) { application ->
                                 LoanApplicationCard(
                                     application = application,
                                     onClick = { onNavigateToDetail(application.id) }
@@ -592,11 +595,20 @@ private fun DetailColumn(label: String, value: String) {
 // ==========================================
 @Composable
 fun StatusChip(status: String) {
-    val (bgColor, textColor) = when (status.lowercase()) {
-        "submitted" -> Color(0xFFFFF3E0) to Color(0xFFE65100)
-        "approved", "disbursed" -> Color(0xFFE8F5E9) to Color(0xFF2E7D32)
-        "rejected" -> Color(0xFFFFEBEE) to Color(0xFFC62828)
-        else -> BekalTheme.extendedColors.accentSoft to BekalTheme.extendedColors.electricViolet
+    val (bgColor, textColor, label) = when (status.lowercase()) {
+        "in_review", "under_review", "diproses" -> Triple(Color(0xFFFFF8E1), Color(0xFFF57F17), "DIPROSES")
+        "in_approval" -> Triple(Color(0xFFF3E5F5), Color(0xFF7B1FA2), "MENUNGGU PERSETUJUAN")
+        "in_disbursement" -> Triple(Color(0xFFE0F2FE), Color(0xFF0284C7), "SEDANG DICAIRKAN")
+        "approved", "disbursed" -> Triple(Color(0xFFE8F5E9), Color(0xFF2E7D32), "DICAIRKAN")
+        "submitted" -> Triple(Color(0xFFFFF3E0), Color(0xFFE65100), "DIAJUKAN")
+        "review_rejected", "approval_rejected", "rejected" -> Triple(Color(0xFFFFEBEE), Color(0xFFC62828), "DITOLAK")
+        "closed" -> Triple(Color(0xFFE8F5E9), Color(0xFF2E7D32), "LUNAS")
+        "cancelled" -> Triple(Color(0xFFFFEBEE), Color(0xFFC62828), "DIBATALKAN")
+        else -> Triple(
+            BekalTheme.extendedColors.accentSoft,
+            BekalTheme.extendedColors.electricViolet,
+            status.replace("_", " ").uppercase()
+        )
     }
 
     Surface(
@@ -604,7 +616,7 @@ fun StatusChip(status: String) {
         shape = CircleShape
     ) {
         Text(
-            text = status.replace("_", " ").uppercase(),
+            text = label,
             modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.xs),
             fontSize = 10.sp,
             color = textColor,
