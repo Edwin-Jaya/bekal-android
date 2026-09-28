@@ -64,9 +64,9 @@ class LoanApplicationViewModel @Inject constructor(
         loadBranches()
     }
 
-    fun loadActivePlafond() {
+    fun loadActivePlafond(isSilent: Boolean = false) {
         viewModelScope.launch {
-            _plafondState.value = PlafondUiState.Loading
+            if (!isSilent) _plafondState.value = PlafondUiState.Loading
             try {
                 val customerId = authRepository.observeSession().first()?.user?.id
                 if (customerId.isNullOrBlank()) {
@@ -103,9 +103,9 @@ class LoanApplicationViewModel @Inject constructor(
         }
     }
 
-    fun loadLoanHistory() {
+    fun loadLoanHistory(isSilent: Boolean = false) {
         viewModelScope.launch {
-            _historyState.value = LoanHistoryUiState.Loading
+            if (!isSilent) _historyState.value = LoanHistoryUiState.Loading
             try {
                 val customerId = authRepository.observeSession().first()?.user?.id
                 if (customerId.isNullOrBlank()) {

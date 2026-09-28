@@ -40,23 +40,29 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.edwin.bekal.data.dto.LoanApplicationResponse
 import com.edwin.bekal.ui.theme.BekalTheme
 import com.edwin.bekal.ui.theme.Elevation
 import com.edwin.bekal.ui.theme.Radius
 import com.edwin.bekal.ui.theme.Spacing
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import java.math.BigDecimal
 import java.text.NumberFormat
 import java.util.Locale
@@ -74,11 +80,27 @@ fun LoansScreen(
     val historyState by viewModel.historyState.collectAsStateWithLifecycle()
     val plafondState by viewModel.plafondState.collectAsStateWithLifecycle()
     val extendedColors = BekalTheme.extendedColors
+    val lifecycleOwner = LocalLifecycleOwner.current
 
+    // 1. Initial fetch saat login status terdeteksi
     LaunchedEffect(isLoggedIn) {
         if (isLoggedIn) {
             viewModel.loadLoanHistory()
             viewModel.loadActivePlafond()
+        }
+    }
+
+    // 2. Reaktif terhadap siklus hidup layar (saat kembali dari Screen Detail / Navigasi lain)
+    DisposableEffect(lifecycleOwner, isLoggedIn) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME && isLoggedIn) {
+                viewModel.loadLoanHistory(isSilent = true)
+                viewModel.loadActivePlafond(isSilent = true)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
 
@@ -91,8 +113,19 @@ fun LoansScreen(
     val hasPendingApplication = (historyState as? LoanHistoryUiState.Success)
         ?.applications
         ?.any { application ->
-            application.status.lowercase() in listOf("in_review", "in_approval","in_disbursement","pending", "under_review", "diproses", "disbursed")
+            application.status.lowercase() in listOf("in_review", "in_approval", "in_disbursement", "pending", "under_review", "diproses", "submitted")
         } == true
+
+    // 3. Reaktif Polling berkala (setiap 5 detik) saat ada pengajuan yang sedang pending / diproses
+    LaunchedEffect(isLoggedIn, hasPendingApplication) {
+        if (isLoggedIn && hasPendingApplication) {
+            while (isActive) {
+                delay(5000L)
+                viewModel.loadLoanHistory(isSilent = true)
+                viewModel.loadActivePlafond(isSilent = true)
+            }
+        }
+    }
 
     Scaffold(
         modifier = modifier,
