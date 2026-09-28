@@ -463,7 +463,7 @@ class RegisterViewModel @Inject constructor(
                 industry = state.industry,
                 declaredIncome = state.monthlyIncome.toDoubleOrNull(),
                 otherIncome = state.otherIncome.toDoubleOrNull(),
-                employmentStartDate = formattedStartDate
+                employmentStartDate = state.employmentStartDate
             )
 
             var customerId = ""

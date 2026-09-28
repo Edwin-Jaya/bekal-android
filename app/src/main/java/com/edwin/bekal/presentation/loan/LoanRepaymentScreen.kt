@@ -29,6 +29,8 @@ import com.edwin.bekal.ui.theme.Elevation
 import com.edwin.bekal.ui.theme.Radius
 import com.edwin.bekal.ui.theme.Spacing
 import java.math.BigDecimal
+import java.text.NumberFormat
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -151,7 +153,7 @@ fun LoanRepaymentScreen(
                                 Spacer(modifier = Modifier.height(Spacing.sm))
                                 Text("Sisa Tagihan", fontSize = 13.sp, color = extendedColors.textMuted)
                                 Text(
-                                    text = "Rp ${balance.remainingBalance.toPlainString()}",
+                                    text = balance.remainingBalance.toRupiahFormat(),
                                     fontSize = 28.sp,
                                     fontWeight = FontWeight.ExtraBold,
                                     color = androidx.compose.ui.graphics.Color.White
@@ -184,13 +186,13 @@ fun LoanRepaymentScreen(
                                 modifier = Modifier.weight(1f),
                                 icon = Icons.Default.ReceiptLong,
                                 label = "Total Tagihan",
-                                value = "Rp ${balance.totalRepayment.toPlainString()}"
+                                value = balance.totalRepayment.toRupiahFormat()
                             )
                             BentoStatCard(
                                 modifier = Modifier.weight(1f),
                                 icon = Icons.Default.Savings,
                                 label = "Total Terbayar",
-                                value = "Rp ${balance.totalPaidSoFar.toPlainString()}"
+                                value = balance.totalPaidSoFar.toRupiahFormat()
                             )
                         }
                         Row(
@@ -201,7 +203,7 @@ fun LoanRepaymentScreen(
                                 modifier = Modifier.weight(1f),
                                 icon = Icons.Default.CreditCard,
                                 label = "Angsuran / Bulan",
-                                value = "Rp ${balance.monthlyInstallment.toPlainString()}"
+                                value = balance.monthlyInstallment.toRupiahFormat()
                             )
                             BentoStatCard(
                                 modifier = Modifier.weight(1f),
@@ -369,4 +371,13 @@ private fun BentoStatCard(
             )
         }
     }
+}
+
+// ==========================================
+// UTILITY FORMATTER
+// ==========================================
+private fun BigDecimal?.toRupiahFormat(): String {
+    if (this == null) return "Rp 0"
+    val formatter = NumberFormat.getCurrencyInstance(Locale("id", "ID"))
+    return formatter.format(this).replace("Rp", "Rp ").replace(",00", "")
 }

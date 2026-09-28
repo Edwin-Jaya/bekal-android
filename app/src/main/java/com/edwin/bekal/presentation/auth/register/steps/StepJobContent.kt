@@ -179,7 +179,9 @@ fun StepJobContent(
                 Box(modifier = Modifier.fillMaxWidth()) {
                     OutlinedTextField(
                         value = uiState.employmentStartDate,
-                        onValueChange = { },
+                        onValueChange = {
+                            viewModel.onEmploymentStartDateChange(it)
+                        },
                         label = { Text("Mulai Bekerja *", fontSize = 12.sp) },
                         placeholder = { Text("YYYY-MM-DD", fontSize = 13.sp, color = extendedColors.textMuted.copy(alpha = 0.5f)) },
                         leadingIcon = { Icon(Icons.Default.CalendarToday, contentDescription = null, tint = extendedColors.textMuted) },
@@ -261,7 +263,7 @@ fun StepJobContent(
                         Icon(Icons.Default.Star, contentDescription = null, tint = extendedColors.electricViolet, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(Spacing.xs))
                         Text(
-                            text = "Estimasi limit kredit tersedia hingga Rp 45.000.000 berdasarkan profil penghasilan Anda.",
+                            text = "Estimasi limit kredit tersedia hingga Rp 50.000.000 berdasarkan profil penghasilan Anda.",
                             fontSize = 11.sp,
                             color = extendedColors.deepCharcoal
                         )

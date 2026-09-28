@@ -62,7 +62,9 @@ import com.edwin.bekal.ui.theme.BekalTheme
 import com.edwin.bekal.ui.theme.Elevation
 import com.edwin.bekal.ui.theme.Radius
 import com.edwin.bekal.ui.theme.Spacing
+import androidx.compose.material3.SelectableDates
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
@@ -79,7 +81,23 @@ fun StepAccountContent(
     var showDatePicker by remember { mutableStateOf(false) }
     var genderExpanded by remember { mutableStateOf(false) }
 
-    val datePickerState = rememberDatePickerState()
+    val eighteenYearsAgoCalendar = remember {
+        Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
+            add(Calendar.YEAR, -18)
+        }
+    }
+    val datePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = eighteenYearsAgoCalendar.timeInMillis,
+        selectableDates = object : SelectableDates {
+            override fun isSelectableDate(utcTimeMillis: Long): Boolean {
+                return utcTimeMillis <= eighteenYearsAgoCalendar.timeInMillis
+            }
+
+            override fun isSelectableYear(year: Int): Boolean {
+                return year <= eighteenYearsAgoCalendar.get(Calendar.YEAR)
+            }
+        }
+    )
     val genderOptions = listOf("Laki-laki", "Perempuan")
     val scrollState = rememberScrollState()
 
@@ -298,6 +316,7 @@ fun StepAccountContent(
                                 }
                             },
                             isError = uiState.dateOfBirthError != null,
+                            supportingText = uiState.dateOfBirthError?.let { { Text(it, color = Color.Red, fontSize = 11.sp) } },
                             modifier = Modifier.fillMaxWidth(),
                             shape = CircleShape,
                             colors = textFieldColors,
