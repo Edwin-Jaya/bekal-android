@@ -90,10 +90,8 @@ fun MainScreen(
                         return@BekalBottomNavigation
                     }
 
-                    if (targetTab == BottomTabRoute.Loans && isLoggedIn) {
-                        loanApplicationViewModel.loadLoanHistory(isSilent = true)
-                        loanApplicationViewModel.loadActivePlafond(isSilent = true)
-                    }
+                    // Refresh ditangani oleh ON_RESUME observer di LoansScreen;
+                    // tidak perlu trigger manual di sini agar tidak terjadi double request.
 
                     bottomNavController.navigate(targetTab) {
                         popUpTo(bottomNavController.graph.findStartDestination().id) {
@@ -107,8 +105,7 @@ fun MainScreen(
                     if (!isLoggedIn) {
                         onNavigateToLogin()
                     } else if (hasActiveApplication) {
-                        loanApplicationViewModel.loadLoanHistory(isSilent = true)
-                        loanApplicationViewModel.loadActivePlafond(isSilent = true)
+                        // Navigasi ke tab Loans; ON_RESUME di LoansScreen akan handle refresh.
                         bottomNavController.navigate(BottomTabRoute.Loans) {
                             popUpTo(bottomNavController.graph.findStartDestination().id) {
                                 saveState = true
@@ -142,8 +139,7 @@ fun MainScreen(
                         }
                     },
                     onNavigateToHistory = {
-                        loanApplicationViewModel.loadLoanHistory(isSilent = true)
-                        loanApplicationViewModel.loadActivePlafond(isSilent = true)
+                        // ON_RESUME di LoansScreen yang handle refresh saat tiba di tab.
                         bottomNavController.navigate(BottomTabRoute.Loans) {
                             popUpTo(bottomNavController.graph.findStartDestination().id) { saveState = true }
                             launchSingleTop = true

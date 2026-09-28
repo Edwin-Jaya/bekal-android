@@ -2,6 +2,7 @@ package com.edwin.bekal.presentation.loan
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.edwin.bekal.core.database.dao.PlafondDao
 import com.edwin.bekal.data.auth.AuthRepository
 import com.edwin.bekal.data.dto.BranchResponse
 import com.edwin.bekal.data.dto.CreateLoanApplicationRequest
@@ -11,11 +12,14 @@ import com.edwin.bekal.data.dto.PlafondResponse
 import com.edwin.bekal.data.loan.remote.BranchApi
 import com.edwin.bekal.data.loan.remote.LoanApplicationApi
 import com.edwin.bekal.data.loan.remote.PlafondApi
+import com.edwin.bekal.data.mapper.toEntity
+import com.edwin.bekal.data.mapper.toResponse
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -30,15 +34,18 @@ class LoanApplicationViewModel @Inject constructor(
     private val api: LoanApplicationApi,
     private val plafondApi: PlafondApi,
     private val branchApi: BranchApi,
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val plafondDao: PlafondDao
 ) : ViewModel() {
 
-    // Reactive Auth State observed by LoansScreen
+    // Reactive Auth State observed by LoansScreen.
+    // Eagerly: flow tetap aktif selama ViewModel hidup, tidak cold-restart
+    // saat user berpindah tab sehingga LaunchedEffect tidak terpicu ulang.
     val isLoggedIn: StateFlow<Boolean> = authRepository.observeSession()
         .map { session -> session?.user?.id != null }
         .stateIn(
             scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
+            started = SharingStarted.Eagerly,
             initialValue = false
         )
 
@@ -66,7 +73,18 @@ class LoanApplicationViewModel @Inject constructor(
 
     fun loadActivePlafond(isSilent: Boolean = false) {
         viewModelScope.launch {
-            if (!isSilent) _plafondState.value = PlafondUiState.Loading
+            // Fix 3: Cache-then-network.
+            // Tampilkan data Room terlebih dahulu agar UI responsif seketika,
+            // lalu fetch network dan perbarui Room + state.
+            val cached = plafondDao.getPlafond().firstOrNull()
+            if (cached != null) {
+                // Sudah ada cache → tampilkan tanpa spinner
+                _plafondState.value = PlafondUiState.Success(cached.toResponse())
+            } else if (!isSilent) {
+                // Belum ada cache sama sekali → tampilkan loading
+                _plafondState.value = PlafondUiState.Loading
+            }
+
             try {
                 val customerId = authRepository.observeSession().first()?.user?.id
                 if (customerId.isNullOrBlank()) {
@@ -74,19 +92,25 @@ class LoanApplicationViewModel @Inject constructor(
                     return@launch
                 }
                 val plafond = plafondApi.getActivePlafond(customerId)
+                // Simpan hasil fresh ke Room untuk request berikutnya
+                plafondDao.clearPlafonds()
+                plafondDao.insertPlafond(plafond.toEntity())
                 _plafondState.value = PlafondUiState.Success(plafond)
             } catch (e: HttpException) {
-                _plafondState.value = when (e.code()) {
-                    404 -> PlafondUiState.NotAvailable
-                    401, 403 -> PlafondUiState.Unauthenticated
-                    else -> PlafondUiState.Error("Gagal memuat plafond (HTTP ${e.code()})")
+                // Jika sudah ada cache, jangan overwrite dengan error
+                if (cached == null) {
+                    _plafondState.value = when (e.code()) {
+                        404 -> PlafondUiState.NotAvailable
+                        401, 403 -> PlafondUiState.Unauthenticated
+                        else -> PlafondUiState.Error("Gagal memuat plafond (HTTP ${e.code()})")
+                    }
                 }
             } catch (e: SerializationException) {
-                _plafondState.value = PlafondUiState.Error("Format data plafond tidak sesuai")
+                if (cached == null) _plafondState.value = PlafondUiState.Error("Format data plafond tidak sesuai")
             } catch (e: IOException) {
-                _plafondState.value = PlafondUiState.Error("Tidak ada koneksi internet")
+                if (cached == null) _plafondState.value = PlafondUiState.Error("Tidak ada koneksi internet")
             } catch (e: Exception) {
-                _plafondState.value = PlafondUiState.Error(e.message ?: "Gagal memuat plafond")
+                if (cached == null) _plafondState.value = PlafondUiState.Error(e.message ?: "Gagal memuat plafond")
             }
         }
     }
