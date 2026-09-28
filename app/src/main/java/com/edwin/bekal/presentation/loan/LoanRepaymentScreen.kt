@@ -28,6 +28,7 @@ import com.edwin.bekal.ui.theme.BekalTheme
 import com.edwin.bekal.ui.theme.Elevation
 import com.edwin.bekal.ui.theme.Radius
 import com.edwin.bekal.ui.theme.Spacing
+import com.edwin.bekal.utils.RupiahVisualTransformation
 import java.math.BigDecimal
 import java.text.NumberFormat
 import java.util.Locale
@@ -264,20 +265,41 @@ fun LoanRepaymentScreen(
                                         color = extendedColors.deepCharcoal
                                     )
 
+                                    val parsedPayment = paymentInput.toBigDecimalOrNull() ?: BigDecimal.ZERO
+                                    val isExceedingBalance = parsedPayment > balance.remainingBalance
+                                    val isAmountZeroOrNegative = paymentInput.isNotBlank() && parsedPayment <= BigDecimal.ZERO
+                                    val paymentError = when {
+                                        isExceedingBalance -> "Pembayaran tidak boleh melebihi sisa tagihan (${balance.remainingBalance.toRupiahFormat()})"
+                                        isAmountZeroOrNegative -> "Jumlah pembayaran harus lebih dari Rp 0"
+                                        else -> null
+                                    }
+
                                     OutlinedTextField(
                                         value = paymentInput,
-                                        onValueChange = { viewModel.paymentInput.value = it },
+                                        onValueChange = { input ->
+                                            val digitsOnly = input.filter { it.isDigit() }
+                                            viewModel.paymentInput.value = digitsOnly
+                                        },
                                         modifier = Modifier.fillMaxWidth(),
-                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                                        prefix = { Text("Rp ") },
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                        prefix = { Text("Rp ", fontWeight = FontWeight.SemiBold, color = extendedColors.deepCharcoal) },
+                                        visualTransformation = RupiahVisualTransformation(),
+                                        isError = paymentError != null,
+                                        supportingText = paymentError?.let {
+                                            { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 12.sp) }
+                                        },
                                         shape = RoundedCornerShape(Radius.sm),
                                         colors = OutlinedTextFieldDefaults.colors(
                                             focusedBorderColor = extendedColors.electricViolet
-                                        )
+                                        ),
+                                        singleLine = true
                                     )
 
                                     OutlinedButton(
-                                        onClick = { viewModel.paymentInput.value = balance.monthlyInstallment.toPlainString() },
+                                        onClick = {
+                                            val targetAmount = balance.monthlyInstallment.min(balance.remainingBalance)
+                                            viewModel.paymentInput.value = targetAmount.toBigInteger().toString()
+                                        },
                                         modifier = Modifier.fillMaxWidth(),
                                         shape = RoundedCornerShape(Radius.sm),
                                         border = androidx.compose.foundation.BorderStroke(
@@ -291,7 +313,7 @@ fun LoanRepaymentScreen(
                                     Button(
                                         onClick = {
                                             val amount = paymentInput.toBigDecimalOrNull()
-                                            if (amount != null && amount > BigDecimal.ZERO) {
+                                            if (amount != null && amount > BigDecimal.ZERO && amount <= balance.remainingBalance) {
                                                 viewModel.executeRepayment(loanId, amount)
                                             }
                                         },
@@ -300,7 +322,7 @@ fun LoanRepaymentScreen(
                                             .height(48.dp),
                                         shape = RoundedCornerShape(Radius.md),
                                         colors = ButtonDefaults.buttonColors(containerColor = extendedColors.electricViolet),
-                                        enabled = submitState !is RepaymentSubmitState.Loading && paymentInput.isNotBlank()
+                                        enabled = submitState !is RepaymentSubmitState.Loading && paymentInput.isNotBlank() && paymentError == null
                                     ) {
                                         if (submitState is RepaymentSubmitState.Loading) {
                                             CircularProgressIndicator(
