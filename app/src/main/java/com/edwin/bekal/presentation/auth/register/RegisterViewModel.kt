@@ -5,6 +5,8 @@ import android.net.Uri
 import android.util.Patterns
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.edwin.bekal.core.error.AppFailure
+import com.edwin.bekal.core.error.CommonFailure
 import com.edwin.bekal.core.error.toErrorMessage
 import com.edwin.bekal.core.network.AppResult
 import com.edwin.bekal.core.network.onFailure
@@ -524,7 +526,7 @@ class RegisterViewModel @Inject constructor(
             )
 
             var customerId: String? = null
-            var friendlyErrorMessage: String? = null
+            var errorMessage: String? = null
 
             // Step 1: Registrasi Akun & Profil Customer
             val registerResult = repository.register(registerDto)
@@ -537,24 +539,24 @@ class RegisterViewModel @Inject constructor(
                 val ktpUri = state.ktpImagePath.toSafeUri()
                 val ktpResult = repository.uploadDocument(context, profile.id, "KTP", ktpUri)
                 if (ktpResult is AppResult.Failure) {
-                    friendlyErrorMessage = "Gagal mengunggah dokumen e-KTP. Pastikan koneksi stabil dan silakan coba beberapa saat lagi."
+                    errorMessage = ktpResult.failure.toFriendlyMessage()
                 }
 
                 // Step 3: Upload Berkas Slip Gaji (jika KTP berhasil)
-                if (friendlyErrorMessage == null && state.paySlipPaths.isNotEmpty()) {
+                if (errorMessage == null && state.paySlipPaths.isNotEmpty()) {
                     _uiState.update { it.copy(loadingMessage = "Mengunggah berkas slip gaji...") }
                     for (path in state.paySlipPaths) {
                         val slipUri = path.toSafeUri()
                         val slipResult = repository.uploadDocument(context, profile.id, "SLIP_GAJI", slipUri)
                         if (slipResult is AppResult.Failure) {
-                            friendlyErrorMessage = "Gagal mengunggah dokumen slip gaji. Silakan periksa koneksi internet Anda dan coba lagi."
+                            errorMessage = slipResult.failure.toFriendlyMessage()
                             break
                         }
                     }
                 }
 
                 // Step 4: Daftarkan Rekening Bank (jika upload dokumen berhasil)
-                if (friendlyErrorMessage == null) {
+                if (errorMessage == null) {
                     _uiState.update { it.copy(loadingMessage = "Menyimpan rekening bank...") }
                     val bankDto = CreateBankAccountRequestDto(
                         customerId = profile.id,
@@ -565,15 +567,15 @@ class RegisterViewModel @Inject constructor(
                     )
                     val bankResult = repository.createBankAccount(bankDto)
                     if (bankResult is AppResult.Failure) {
-                        friendlyErrorMessage = "Gagal memverifikasi rekening bank Anda. Silakan coba beberapa saat lagi."
+                        errorMessage = bankResult.failure.toFriendlyMessage()
                     }
                 }
-            } else {
-                friendlyErrorMessage = "Pendaftaran akun belum dapat diproses saat ini. Silakan coba kembali beberapa saat lagi."
+            } else if (registerResult is AppResult.Failure) {
+                errorMessage = registerResult.failure.toFriendlyMessage()
             }
 
             // --- Centralized Rollback & State Update Handler ---
-            if (friendlyErrorMessage != null) {
+            if (errorMessage != null) {
                 if (customerId != null) {
                     _uiState.update { it.copy(loadingMessage = "Membatalkan registrasi...") }
                     repository.rollbackRegistration(customerId)
@@ -582,7 +584,7 @@ class RegisterViewModel @Inject constructor(
                     it.copy(
                         isLoading = false,
                         loadingMessage = "",
-                        errorMessage = friendlyErrorMessage
+                        errorMessage = errorMessage
                     )
                 }
             } else {
@@ -599,3 +601,17 @@ class RegisterViewModel @Inject constructor(
         }
     }
 }
+
+/**
+ * Wrapper aman di atas [toErrorMessage] khusus untuk flow registrasi.
+ * [CommonFailure.Unexpected] biasanya membawa pesan teknikal dari Java/Kotlin
+ * exception — diganti dengan pesan generik yang aman ditampilkan ke user.
+ * Semua tipe failure lain (Network, Unauthorized, ApiError) tetap
+ * menggunakan pesan aslinya karena sudah terjamin user-friendly.
+ */
+private fun AppFailure.toFriendlyMessage(): String =
+    if (this is CommonFailure.Unexpected) {
+        "Terjadi kesalahan yang tidak terduga. Silakan coba beberapa saat lagi."
+    } else {
+        toErrorMessage()
+    }
