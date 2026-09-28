@@ -21,6 +21,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
+import java.util.TimeZone
 import javax.inject.Inject
 
 @HiltViewModel
@@ -238,7 +242,11 @@ class RegisterViewModel @Inject constructor(
     fun validateStepAccount(): Boolean {
         val currentState = _uiState.value
 
-        val fullNameError = if (currentState.fullName.isBlank()) "Nama lengkap wajib diisi" else null
+        val fullNameError = when {
+            currentState.fullName.isBlank() -> "Nama lengkap wajib diisi"
+            currentState.fullName.trim().length < 3 -> "Nama lengkap minimal 3 karakter"
+            else -> null
+        }
 
         val isEmailPatternValid = Patterns.EMAIL_ADDRESS.matcher(currentState.email).matches()
         val isGmailDomain = currentState.email.lowercase().endsWith("@gmail.com")
@@ -260,7 +268,40 @@ class RegisterViewModel @Inject constructor(
             else -> null
         }
 
-        val dateOfBirthError = if (currentState.dateOfBirth.isBlank()) "Tanggal lahir wajib diisi" else null
+        // Validasi Tanggal Lahir (Wajib diisi & Minimal 18 Tahun)
+        val dateOfBirthError = when {
+            currentState.dateOfBirth.isBlank() -> "Tanggal lahir wajib diisi"
+            else -> {
+                try {
+                    val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).apply {
+                        timeZone = TimeZone.getTimeZone("UTC")
+                    }
+                    val birthDate = sdf.parse(currentState.dateOfBirth)
+
+                    if (birthDate == null) {
+                        "Format tanggal lahir tidak valid"
+                    } else {
+                        // Batas waktu maksimal tanggal lahir adalah tepat 18 tahun yang lalu
+                        val cutoffCalendar = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
+                            add(Calendar.YEAR, -18)
+                            set(Calendar.HOUR_OF_DAY, 23)
+                            set(Calendar.MINUTE, 59)
+                            set(Calendar.SECOND, 59)
+                            set(Calendar.MILLISECOND, 999)
+                        }
+
+                        if (birthDate.time > cutoffCalendar.timeInMillis) {
+                            "Usia pendaftar minimal 18 tahun"
+                        } else {
+                            null
+                        }
+                    }
+                } catch (e: Exception) {
+                    "Format tanggal lahir tidak valid"
+                }
+            }
+        }
+
         val genderError = if (currentState.gender.isBlank()) "Jenis kelamin wajib dipilih" else null
         val addressError = if (currentState.address.isBlank()) "Alamat domisili wajib diisi" else null
 
@@ -368,7 +409,13 @@ class RegisterViewModel @Inject constructor(
         val currentState = _uiState.value
 
         val bankNameError = if (currentState.bankName.isBlank()) "Nama bank penerima wajib diisi" else null
-        val bankAccountNumberError = if (currentState.bankAccountNumber.isBlank()) "Nomor rekening bank wajib diisi" else null
+
+        val bankAccountNumberError = when {
+            currentState.bankAccountNumber.isBlank() -> "Nomor rekening bank wajib diisi"
+            currentState.bankAccountNumber.length != 10 -> "Nomor rekening BCA harus 10 digit"
+            else -> null
+        }
+
         val paySlipError = if (currentState.paySlipPaths.isEmpty()) "Minimal 1 dokumen slip gaji wajib diunggah" else null
         val termsAgreedError = if (!currentState.isTermsAgreed) "Anda wajib menyetujui Syarat & Ketentuan Layanan" else null
 
@@ -466,74 +513,79 @@ class RegisterViewModel @Inject constructor(
                 employmentStartDate = state.employmentStartDate
             )
 
-            var customerId = ""
-            repository.register(registerDto)
-                .onSuccess { customerProfile -> customerId = customerProfile.id }
-                .onFailure { failure ->
-                    _uiState.update {
-                        it.copy(isLoading = false, errorMessage = failure.toErrorMessage())
-                    }
-                    return@launch
+            var customerId: String? = null
+            var friendlyErrorMessage: String? = null
+
+            // Step 1: Registrasi Akun & Profil Customer
+            val registerResult = repository.register(registerDto)
+            if (registerResult is AppResult.Success) {
+                val profile = registerResult.data
+                customerId = profile.id
+
+                // Step 2: Upload foto e-KTP
+                _uiState.update { it.copy(loadingMessage = "Mengunggah dokumen e-KTP...") }
+                val ktpUri = state.ktpImagePath.toSafeUri()
+                val ktpResult = repository.uploadDocument(context, profile.id, "KTP", ktpUri)
+                if (ktpResult is AppResult.Failure) {
+                    friendlyErrorMessage = "Gagal mengunggah dokumen e-KTP. Pastikan koneksi stabil dan silakan coba beberapa saat lagi."
                 }
 
-            // 2. Upload foto KTP
-            _uiState.update { it.copy(loadingMessage = "Mengunggah dokumen e-KTP...") }
-            val ktpUri = state.ktpImagePath.toSafeUri()
-            repository.uploadDocument(context, customerId, "KTP", ktpUri)
-                .onFailure { failure ->
-                    _uiState.update { it.copy(loadingMessage = "Membatalkan registrasi...") }
-                    repository.rollbackRegistration(customerId)
-                    _uiState.update {
-                        it.copy(isLoading = false, errorMessage = failure.toErrorMessage())
-                    }
-                    return@launch
-                }
-
-            // 3. Upload Berkas Slip Gaji
-            if (state.paySlipPaths.isNotEmpty()) {
-                _uiState.update { it.copy(loadingMessage = "Mengunggah berkas slip gaji...") }
-                for (path in state.paySlipPaths) {
-                    val slipUri = path.toSafeUri()
-                    repository.uploadDocument(context, customerId, "SLIP_GAJI", slipUri)
-                        .onFailure { failure ->
-                            _uiState.update { it.copy(loadingMessage = "Membatalkan registrasi...") }
-                            repository.rollbackRegistration(customerId)
-                            _uiState.update {
-                                it.copy(isLoading = false, errorMessage = failure.toErrorMessage())
-                            }
-                            return@launch
+                // Step 3: Upload Berkas Slip Gaji (jika KTP berhasil)
+                if (friendlyErrorMessage == null && state.paySlipPaths.isNotEmpty()) {
+                    _uiState.update { it.copy(loadingMessage = "Mengunggah berkas slip gaji...") }
+                    for (path in state.paySlipPaths) {
+                        val slipUri = path.toSafeUri()
+                        val slipResult = repository.uploadDocument(context, profile.id, "SLIP_GAJI", slipUri)
+                        if (slipResult is AppResult.Failure) {
+                            friendlyErrorMessage = "Gagal mengunggah dokumen slip gaji. Silakan periksa koneksi internet Anda dan coba lagi."
+                            break
                         }
+                    }
                 }
+
+                // Step 4: Daftarkan Rekening Bank (jika upload dokumen berhasil)
+                if (friendlyErrorMessage == null) {
+                    _uiState.update { it.copy(loadingMessage = "Menyimpan rekening bank...") }
+                    val bankDto = CreateBankAccountRequestDto(
+                        customerId = profile.id,
+                        bankName = state.bankName,
+                        bankAccountNumber = state.bankAccountNumber,
+                        bankAccountHolder = state.fullName,
+                        isPrimary = true
+                    )
+                    val bankResult = repository.createBankAccount(bankDto)
+                    if (bankResult is AppResult.Failure) {
+                        friendlyErrorMessage = "Gagal memverifikasi rekening bank Anda. Silakan coba beberapa saat lagi."
+                    }
+                }
+            } else {
+                friendlyErrorMessage = "Pendaftaran akun belum dapat diproses saat ini. Silakan coba kembali beberapa saat lagi."
             }
 
-            // 4. Daftarkan Rekening Bank
-            _uiState.update { it.copy(loadingMessage = "Menyimpan rekening bank...") }
-            val bankDto = CreateBankAccountRequestDto(
-                customerId = customerId,
-                bankName = state.bankName,
-                bankAccountNumber = state.bankAccountNumber,
-                bankAccountHolder = state.fullName,
-                isPrimary = true
-            )
-
-            repository.createBankAccount(bankDto)
-                .onSuccess {
-                    clearPendingUploads(context)
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            isSuccess = true,
-                            loadingMessage = ""
-                        )
-                    }
-                }
-                .onFailure { failure ->
+            // --- Centralized Rollback & State Update Handler ---
+            if (friendlyErrorMessage != null) {
+                if (customerId != null) {
                     _uiState.update { it.copy(loadingMessage = "Membatalkan registrasi...") }
                     repository.rollbackRegistration(customerId)
-                    _uiState.update {
-                        it.copy(isLoading = false, errorMessage = failure.toErrorMessage())
-                    }
                 }
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        loadingMessage = "",
+                        errorMessage = friendlyErrorMessage
+                    )
+                }
+            } else {
+                // Semua langkah sukses
+                clearPendingUploads(context)
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        isSuccess = true,
+                        loadingMessage = ""
+                    )
+                }
+            }
         }
     }
 }

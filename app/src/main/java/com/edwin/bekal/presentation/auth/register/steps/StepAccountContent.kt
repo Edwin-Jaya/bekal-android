@@ -6,9 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -38,6 +36,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -62,7 +61,6 @@ import com.edwin.bekal.ui.theme.BekalTheme
 import com.edwin.bekal.ui.theme.Elevation
 import com.edwin.bekal.ui.theme.Radius
 import com.edwin.bekal.ui.theme.Spacing
-import androidx.compose.material3.SelectableDates
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -81,23 +79,35 @@ fun StepAccountContent(
     var showDatePicker by remember { mutableStateOf(false) }
     var genderExpanded by remember { mutableStateOf(false) }
 
-    val eighteenYearsAgoCalendar = remember {
+    // Batas Maksimal Tanggal Lahir (18 Tahun yang lalu dari hari ini)
+    val maxSelectableDateCalendar = remember {
         Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
             add(Calendar.YEAR, -18)
+            // Diset ke akhir hari UTC agar tanggal lahir tepat 18 tahun lalu tidak terkunci
+            set(Calendar.HOUR_OF_DAY, 23)
+            set(Calendar.MINUTE, 59)
+            set(Calendar.SECOND, 59)
+            set(Calendar.MILLISECOND, 999)
         }
     }
+
+    val maxDateMillis = maxSelectableDateCalendar.timeInMillis
+    val maxYear = maxSelectableDateCalendar.get(Calendar.YEAR)
+
     val datePickerState = rememberDatePickerState(
-        initialSelectedDateMillis = eighteenYearsAgoCalendar.timeInMillis,
+        initialSelectedDateMillis = maxDateMillis,
         selectableDates = object : SelectableDates {
             override fun isSelectableDate(utcTimeMillis: Long): Boolean {
-                return utcTimeMillis <= eighteenYearsAgoCalendar.timeInMillis
+                // Memastikan tidak melebihi 18 tahun lalu (otomatis tidak melebihi hari ini)
+                return utcTimeMillis <= maxDateMillis
             }
 
             override fun isSelectableYear(year: Int): Boolean {
-                return year <= eighteenYearsAgoCalendar.get(Calendar.YEAR)
+                return year <= maxYear
             }
         }
     )
+
     val genderOptions = listOf("Laki-laki", "Perempuan")
     val scrollState = rememberScrollState()
 
@@ -107,6 +117,10 @@ fun StepAccountContent(
         unfocusedContainerColor = extendedColors.canvasBackground.copy(alpha = 0.5f),
         focusedContainerColor = Color.White
     )
+
+    // Validasi Nama minimal 3 karakter
+    val isNameTooShort = uiState.fullName.isNotBlank() && uiState.fullName.trim().length < 3
+    val nameErrorText = uiState.fullNameError ?: if (isNameTooShort) "Nama lengkap minimal 3 karakter" else null
 
     Column(
         modifier = modifier
@@ -159,18 +173,20 @@ fun StepAccountContent(
                     }
                 }
 
+                // Field Nama Lengkap dengan Validasi Min 3 Karakter
                 OutlinedTextField(
                     value = uiState.fullName,
                     onValueChange = viewModel::onFullNameChange,
                     label = { Text("Nama Lengkap (Sesuai KTP) *", fontSize = 12.sp) },
                     leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = extendedColors.textMuted) },
                     trailingIcon = {
-                        if (uiState.fullName.isNotBlank()) {
+                        // Centang hijau hanya jika nama terisi dan minimal 3 karakter
+                        if (uiState.fullName.trim().length >= 3) {
                             Icon(Icons.Default.CheckCircle, contentDescription = null, tint = extendedColors.electricViolet)
                         }
                     },
-                    isError = uiState.fullNameError != null,
-                    supportingText = uiState.fullNameError?.let { { Text(it, color = Color.Red, fontSize = 11.sp) } },
+                    isError = nameErrorText != null,
+                    supportingText = nameErrorText?.let { { Text(it, color = Color.Red, fontSize = 11.sp) } },
                     modifier = Modifier.fillMaxWidth(),
                     shape = CircleShape,
                     colors = textFieldColors,
